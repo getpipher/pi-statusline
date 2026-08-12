@@ -21,5 +21,8 @@ Thumbs.db
 # firecrawl research cache (if any local scraping happens here)
 .firecrawl/
 
+# pi local session/cache artifacts
+.pi/
+
 # logs
 *.log
