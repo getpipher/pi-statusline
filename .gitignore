@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+*.tsbuildinfo
+
+# os
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+
+# env / secrets (never commit)
+.env
+.env.*
+
+# firecrawl research cache (if any local scraping happens here)
+.firecrawl/
+
+# logs
+*.log
