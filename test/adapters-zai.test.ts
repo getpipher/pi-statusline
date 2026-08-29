@@ -1,0 +1,125 @@
+// test/adapters-zai.test.ts
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createZaiAdapter, renderZaiQuota } from "../src/adapters/zai.ts";
+import { resolveQuotaAdapter } from "../src/adapters/types.ts";
+import { createQuotaRow } from "../src/rows/quota.ts";
+import type { QuotaResult } from "../src/quota/zai.ts";
+import type { ProviderRowAdapter } from "../src/adapters/types.ts";
+import type { RowSnapshot } from "../src/rows/registry.ts";
+import { DEFAULT_CONFIG } from "../src/config.ts";
+import type { SessionSnapshot } from "../src/session/store.ts";
+
+const NOW = Date.UTC(2026, 7, 30, 10, 0);
+
+const QUOTA: QuotaResult = {
+  tier: "lite",
+  fiveHour: { unit: 3, number: 5, usage: 2000, currentValue: 1500, remaining: 500, percentage: 75, nextResetTime: NOW + 2 * 3_600_000 + 55 * 60_000 },
+  weekly: { unit: 6, number: 1, usage: 10000, currentValue: 1500, remaining: 8500, percentage: 15, nextResetTime: NOW + 86_400_000 },
+  fetchedAt: NOW,
+};
+
+test("renderZaiQuota produces the exact label-first format", () => {
+  assert.equal(
+    renderZaiQuota(QUOTA, NOW),
+    "zai ▕████████░░▏ 75% 1.5k/2.0k 5h · wk 15% · reset 2h55m",
+  );
+});
+
+test("renderZaiQuota falls back to weekly when 5h window is missing", () => {
+  const weeklyOnly = { ...QUOTA, fiveHour: null } as QuotaResult;
+  const out = renderZaiQuota(weeklyOnly, NOW);
+  assert.ok(out.startsWith("zai ▕██░░░░░░░░▏ 15%"));
+  assert.ok(!out.includes("5h"));
+});
+
+test("createZaiAdapter: matches only zai; inert without key; fetch refreshes current()", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zai-adapter-"));
+  let calls = 0;
+  const adapter = createZaiAdapter({
+    authJsonPath: join(dir, "auth.json"),
+    readKey: () => "fixture-key",
+    pollIntervalMs: () => 3_600_000,
+    fetchFn: async () => { calls += 1; return QUOTA; },
+  });
+  assert.equal(adapter.id, "zai");
+  assert.equal(adapter.matches("zai"), true);
+  assert.equal(adapter.matches("anthropic"), false);
+  assert.equal(adapter.current(), null); // inert until started
+  adapter.start();
+  await adapter.fetch();
+  assert.equal(calls, 1);
+  assert.equal(adapter.current(), QUOTA);
+  adapter.stop();
+  // Without a key the adapter never polls.
+  const noKey = createZaiAdapter({
+    authJsonPath: join(dir, "auth.json"),
+    readKey: () => null,
+    pollIntervalMs: () => 3_600_000,
+    fetchFn: async () => QUOTA,
+  });
+  noKey.start();
+  await noKey.fetch();
+  assert.equal(noKey.current(), null);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveQuotaAdapter prefers the active provider, else first adapter with data", () => {
+  const zai: ProviderRowAdapter<QuotaResult> = {
+    id: "zai", matches: (p) => p === "zai", current: () => QUOTA,
+    fetch: async () => QUOTA, render: () => "zai", start() {}, stop() {},
+  };
+  const or: ProviderRowAdapter<object> = {
+    id: "openrouter", matches: (p) => p === "openrouter", current: () => ({}),
+    fetch: async () => ({}), render: () => "or", start() {}, stop() {},
+  };
+  assert.equal(resolveQuotaAdapter([zai, or], "openrouter"), or);
+  assert.equal(resolveQuotaAdapter([zai, or], "anthropic"), zai); // fallback: first with data
+  const noData: ProviderRowAdapter<QuotaResult> = {
+    id: "zai", matches: (p) => p === "zai", current: () => null,
+    fetch: async () => null, render: () => "zai", start() {}, stop() {},
+  };
+  assert.equal(resolveQuotaAdapter([noData], "zai"), null); // no adapter holds data → null
+});
+
+function snap(partial: Partial<RowSnapshot>): RowSnapshot {
+  return {
+    now: NOW, width: 500,
+    session: {
+      sessionName: undefined, repoName: "r", branch: "main", modelId: "glm-5.2", provider: "zai",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 },
+      contextTokens: null, contextWindow: 0, contextPercent: null, spanMs: 0,
+    } satisfies SessionSnapshot,
+    ledger: null as never,
+    statuses: "",
+    config: DEFAULT_CONFIG,
+    ...partial,
+  };
+}
+
+function plain(frags: ReturnType<ReturnType<typeof createQuotaRow>["render"]>): string {
+  return (frags ?? []).map((f) => f.text).join("");
+}
+
+test("quota row: renders the adapter line; dimmed when active provider ≠ adapter", () => {
+  const zai: ProviderRowAdapter<QuotaResult> = {
+    id: "zai", matches: (p) => p === "zai", current: () => QUOTA,
+    fetch: async () => QUOTA, render: (d, dim) => renderZaiQuota(d, NOW) + (dim ? "!" : ""), start() {}, stop() {},
+  };
+  const row = createQuotaRow([zai]);
+  const active = row.render(snap({}))!;
+  assert.deepEqual(active, [{ text: renderZaiQuota(QUOTA, NOW), color: "muted" }]);
+  const inactive = row.render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider: "anthropic" } }))!;
+  assert.deepEqual(inactive, [{ text: `${renderZaiQuota(QUOTA, NOW)}!`, color: "dim" }]);
+});
+
+test("quota row: null when no adapter has data", () => {
+  const zai: ProviderRowAdapter<QuotaResult> = {
+    id: "zai", matches: (p) => p === "zai", current: () => null,
+    fetch: async () => null, render: () => "zai", start() {}, stop() {},
+  };
+  assert.equal(createQuotaRow([zai]).render(snap({})), null);
+});
