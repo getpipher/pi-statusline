@@ -1,0 +1,35 @@
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: [main]
+    tags: ['**']
+
+permissions:
+  contents: read
+
+# Enable by setting the repository variable MIRROR_ENABLED=true
+# (and the GITLAB_SSH_KEY secret). The getpipher namespace is GitHub-only;
+# GitLab Free can't host a top-level getpipher group, so the mirror lives under
+# the personal rz1989s namespace.
+jobs:
+  mirror:
+    if: ${{ vars.MIRROR_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install ssh key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITLAB_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
+
+      - name: Push mirror
+        run: |
+          git remote add mirror "git@gitlab.com:rz1989s/pi-statusline.git"
+          git push --force mirror main
+          git push --force mirror --tags
