@@ -40,6 +40,32 @@ export function readZaiKey(authJsonPath: string): string | null {
   return zai.key;
 }
 
+function parseQuotaLimit(value: unknown): QuotaLimit | null {
+  if (!value || typeof value !== "object") return null;
+  const entry = value as Record<string, unknown>;
+  const fields = [
+    "unit",
+    "number",
+    "usage",
+    "currentValue",
+    "remaining",
+    "percentage",
+    "nextResetTime",
+  ] as const;
+  if (!fields.every((field) => typeof entry[field] === "number" && Number.isFinite(entry[field]))) {
+    return null;
+  }
+  return {
+    unit: entry.unit as number,
+    number: entry.number as number,
+    usage: entry.usage as number,
+    currentValue: entry.currentValue as number,
+    remaining: entry.remaining as number,
+    percentage: entry.percentage as number,
+    nextResetTime: entry.nextResetTime as number,
+  };
+}
+
 export function parseQuotaResponse(body: string): QuotaResult | null {
   let parsed: Record<string, unknown>;
   try {
@@ -53,7 +79,7 @@ export function parseQuotaResponse(body: string): QuotaResult | null {
   const data = parsed.data as Record<string, unknown> | undefined;
   if (!data) return null;
 
-  const limits = data.limits as Array<Record<string, number>> | undefined;
+  const limits = data.limits;
   if (!Array.isArray(limits) || limits.length === 0) return null;
 
   const level = data.level as string;
@@ -62,21 +88,15 @@ export function parseQuotaResponse(body: string): QuotaResult | null {
   let fiveHour: QuotaLimit | null = null;
   let weekly: QuotaLimit | null = null;
 
-  for (const lim of limits) {
-    const ql: QuotaLimit = {
-      unit: lim.unit,
-      number: lim.number,
-      usage: lim.usage,
-      currentValue: lim.currentValue,
-      remaining: lim.remaining,
-      percentage: lim.percentage,
-      nextResetTime: lim.nextResetTime,
-    };
+  for (const limit of limits) {
+    const parsedLimit = parseQuotaLimit(limit);
+    if (!parsedLimit) continue;
     // unit 3 = 5-hour window, unit 6 = weekly window
-    if (lim.unit === 3) fiveHour = ql;
-    else if (lim.unit === 6) weekly = ql;
+    if (parsedLimit.unit === 3) fiveHour = parsedLimit;
+    else if (parsedLimit.unit === 6) weekly = parsedLimit;
   }
 
+  if (!fiveHour && !weekly) return null;
   return { tier: level, fiveHour, weekly, fetchedAt: Date.now() };
 }
 

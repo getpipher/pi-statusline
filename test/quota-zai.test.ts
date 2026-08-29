@@ -102,6 +102,35 @@ test("parseQuotaResponse returns null when limits array empty", () => {
   assert.equal(result, null);
 });
 
+test("parseQuotaResponse skips malformed limits but keeps a valid window", () => {
+  const result = parseQuotaResponse(JSON.stringify({
+    ...SAMPLE_API_RESPONSE,
+    data: {
+      ...SAMPLE_API_RESPONSE.data,
+      limits: [
+        SAMPLE_API_RESPONSE.data.limits[0],
+        { unit: 6, usage: "not-a-number", currentValue: Number.NaN },
+        null,
+      ],
+    },
+  }));
+  assert.ok(result);
+  assert.ok(result.fiveHour);
+  assert.equal(result.weekly, null);
+});
+
+test("parseQuotaResponse returns null when every limit is malformed", () => {
+  const result = parseQuotaResponse(JSON.stringify({
+    code: 200,
+    success: true,
+    data: {
+      level: "lite",
+      limits: [null, {}, { unit: 3, number: 5, usage: Number.POSITIVE_INFINITY }],
+    },
+  }));
+  assert.equal(result, null);
+});
+
 const POLLER_FIXTURE: QuotaResult = {
   tier: "lite",
   fiveHour: { unit: 3, number: 5, usage: 2000, currentValue: 1501, remaining: 498, percentage: 75, nextResetTime: 1786539568992 },
