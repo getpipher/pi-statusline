@@ -101,6 +101,8 @@ export interface QuotaPollerOpts {
   apiKey: string;
   intervalMs: number;
   onRefresh?: () => void;
+  /** Injection seam for tests (defaults to the real fetchQuota). */
+  fetchFn?: (apiKey: string) => Promise<QuotaResult | null>;
 }
 
 export interface QuotaPoller {
@@ -119,10 +121,15 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
     if (polling) return;
     polling = true;
     try {
-      const result = await fetchQuota(opts.apiKey);
+      const doFetch = opts.fetchFn ?? fetchQuota;
+      const result = await doFetch(opts.apiKey);
       if (result) {
         cache = result;
-        opts.onRefresh?.();
+        try {
+          opts.onRefresh?.();
+        } catch {
+          /* render hook failures must not crash the host */
+        }
       }
     } finally {
       polling = false;
@@ -133,8 +140,10 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
     get: () => cache,
     start: () => {
       if (timer) return;
-      void doPoll(); // fire immediately on start
-      timer = setInterval(() => void doPoll(), opts.intervalMs);
+      // Fetch errors degrade to null inside doPoll; this swallows anything unexpected
+      // so a fire-and-forget rejection can never escape as an unhandled rejection.
+      void doPoll().catch(() => {}); // fire immediately on start
+      timer = setInterval(() => void doPoll().catch(() => {}), opts.intervalMs);
     },
     stop: () => {
       if (timer) {

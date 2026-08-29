@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import {
   readZaiKey,
   parseQuotaResponse,
+  createQuotaPoller,
   type QuotaResult,
 } from "../src/quota/zai.ts";
 
@@ -99,4 +100,35 @@ test("parseQuotaResponse returns null when limits array empty", () => {
     code: 200, success: true, data: { limits: [], level: "lite" },
   }));
   assert.equal(result, null);
+});
+
+const POLLER_FIXTURE: QuotaResult = {
+  tier: "lite",
+  fiveHour: { unit: 3, number: 5, usage: 2000, currentValue: 1501, remaining: 498, percentage: 75, nextResetTime: 1786539568992 },
+  weekly: { unit: 6, number: 1, usage: 10000, currentValue: 1501, remaining: 8498, percentage: 15, nextResetTime: 1787126084998 },
+  fetchedAt: 1_786_000_000_000,
+};
+
+test("poller: cache is null before first poll and set after refresh", async () => {
+  const poller = createQuotaPoller({
+    apiKey: "test",
+    intervalMs: 60_000,
+    fetchFn: async () => POLLER_FIXTURE,
+  });
+  assert.equal(poller.get(), null);
+  await poller.refresh();
+  assert.ok(poller.get());
+  assert.equal(poller.get()!.fiveHour!.remaining, 498);
+});
+
+test("poller: throwing onRefresh does not reject refresh() and cache is still set", async () => {
+  const poller = createQuotaPoller({
+    apiKey: "test",
+    intervalMs: 60_000,
+    fetchFn: async () => POLLER_FIXTURE,
+    onRefresh: () => { throw new Error("render gone"); },
+  });
+  await poller.refresh(); // must resolve, not reject
+  assert.ok(poller.get());
+  assert.equal(poller.get()!.fiveHour!.remaining, 498);
 });
