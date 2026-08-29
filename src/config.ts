@@ -37,6 +37,9 @@ export function loadConfig(path: string): StatuslineConfig {
   } catch {
     return structuredClone(DEFAULT_CONFIG);
   }
+  if (!parsed || typeof parsed !== "object") {
+    return structuredClone(DEFAULT_CONFIG);
+  }
 
   const cfg = structuredClone(DEFAULT_CONFIG);
 

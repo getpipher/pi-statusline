@@ -30,6 +30,12 @@ test("loadConfig returns defaults when file missing", () => {
   assert.deepEqual(cfg, DEFAULT_CONFIG);
 });
 
+test("loadConfig returns defaults for literal JSON null", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, "null");
+  assert.deepEqual(loadConfig(path), DEFAULT_CONFIG);
+});
+
 test("loadConfig reads a valid file", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({

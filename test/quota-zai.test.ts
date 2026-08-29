@@ -50,6 +50,12 @@ test("readZaiKey returns null on malformed JSON", () => {
   assert.equal(key, null);
 });
 
+test("readZaiKey returns null on literal JSON null", () => {
+  const path = join(tmpDir, "auth.json");
+  writeFileSync(path, "null");
+  assert.equal(readZaiKey(path), null);
+});
+
 const SAMPLE_API_RESPONSE = {
   code: 200,
   msg: "Operation successful",

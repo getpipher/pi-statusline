@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { detectProvider, isZaiProvider } from "../src/provider.ts";
 import { renderModelSegment } from "../src/segments/model.ts";
 import { renderGitSegment } from "../src/segments/git.ts";
-import { renderTokensSegment } from "../src/segments/tokens.ts";
+import { renderTokensSegment, formatTokenCount } from "../src/segments/tokens.ts";
 import { renderContextSegment } from "../src/segments/context.ts";
 import { renderQuotaSegment } from "../src/segments/quota.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
@@ -49,6 +49,23 @@ test("renderTokensSegment formats input/output", () => {
   const result = renderTokensSegment(entries as any);
   assert.ok(result.includes("↑1.5k"), `input total: ${result}`);
   assert.ok(result.includes("↓700"), `output total: ${result}`);
+});
+
+test("formatTokenCount matches the quota k-format bands", () => {
+  assert.equal(formatTokenCount(700), "700");
+  assert.equal(formatTokenCount(1500), "1.5k");
+  assert.equal(formatTokenCount(9999), "10.0k");
+  assert.equal(formatTokenCount(15000), "15k");
+  assert.equal(formatTokenCount(2500000), "2500k");
+});
+
+test("renderTokensSegment bands above 10k without a trailing .0", () => {
+  const entries = [
+    { type: "message", message: { role: "assistant", usage: { input: 15000, output: 900 } } },
+  ];
+  const result = renderTokensSegment(entries as any);
+  assert.ok(result.includes("↑15k"), `input bands to rounded k: ${result}`);
+  assert.ok(result.includes("↓900"), `output below 1k stays plain: ${result}`);
 });
 
 test("renderContextSegment uses pi's precomputed percent", () => {

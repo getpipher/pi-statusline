@@ -34,6 +34,7 @@ export function readZaiKey(authJsonPath: string): string | null {
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== "object") return null;
 
   const zai = parsed.zai as Record<string, unknown> | undefined;
   if (!zai || typeof zai.key !== "string") return null;

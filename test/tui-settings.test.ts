@@ -28,6 +28,10 @@ test("parseStatuslineArgs: 'tier auto' → set tier", () => {
   assert.deepEqual(parseStatuslineArgs("tier lite"), { action: "set-tier", tier: "lite" });
 });
 
+test("parseStatuslineArgs: tier tolerates surrounding whitespace and mixed case", () => {
+  assert.deepEqual(parseStatuslineArgs("  TiEr   PRO  "), { action: "set-tier", tier: "pro" });
+});
+
 test("parseStatuslineArgs: 'tier invalid' → error", () => {
   const result = parseStatuslineArgs("tier bogus");
   assert.equal(result.action, "error");
