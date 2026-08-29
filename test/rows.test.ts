@@ -124,3 +124,51 @@ test("ctx row: cache hit uses cacheRead/(cacheRead+input); omitted when denomina
   const zero = row.render(snap({ session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 } }) }));
   assert.ok(!plain(zero).includes("cache"));
 });
+
+// ── Task 8: money row ──
+import { createMoneyRow } from "../src/rows/money.ts";
+
+const LEDGER = {
+  todayCost: 8.4,
+  last7Cost: 31.2,
+  last30Cost: 118.75,
+  daily: [1, 2, 3, 5, 3, 2, 8.4],
+};
+
+test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
+  const row = createMoneyRow();
+  const frags = row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
+    ledger: LEDGER,
+  }))!;
+  // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → level = max(0, floor(v/max*7)-1)
+  // (Task 1's pinned mapping) → ▁▁▂▄▂▁▇. Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
+  assert.deepEqual(frags, [
+    { text: "$", color: "dim" },
+    { text: " 1.24 sess", color: "muted" },
+    { text: " · 8.40 day", color: "muted" },
+    { text: " · 31.20 7d", color: "muted" },
+    { text: " · 118.75 30d", color: "muted" },
+    { text: " ▁▁▂▄▂▁▇", color: "accent" },
+    { text: " · $0.39/hr", color: "muted" },
+  ]);
+});
+
+test("money row: burn rate renders — when fewer than 2 usage entries", () => {
+  const row = createMoneyRow();
+  const out = plain(row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 5, count: 1 } }),
+    ledger: LEDGER,
+  })));
+  assert.ok(out.includes(" · —"));
+});
+
+test("money row: sparkline omitted when display.sparkline=false", () => {
+  const row = createMoneyRow();
+  const cfgSnap = snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 2 } }),
+    ledger: LEDGER,
+    config: { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, sparkline: false } },
+  });
+  assert.ok(!plain(row.render(cfgSnap)).includes("▁"));
+});
