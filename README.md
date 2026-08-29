@@ -26,4 +26,14 @@ In `~/.pi/agent/settings.json`:
 }
 ```
 
-Run `/statusline` for the interactive settings panel.
+## Commands
+
+v1 ships a notify-based command surface (no interactive panel — the TUI panel
+is deferred):
+
+- `/statusline refresh` — force a quota poll now
+- `/statusline on` / `/statusline off` — enable/disable; `off` restores pi's native footer until `on`
+- `/statusline tier <auto|lite|pro|max>` — tier override
+
+Arguments are lenient: case-insensitive, surrounding whitespace tolerated, and
+trailing extra arguments are ignored.

@@ -8,8 +8,8 @@
 
 ## Status
 
-**Current:** Design phase — **v2 spec finalized** (A3″/A4′/A5-refined locked; z.ai quota API confirmed). Repo: docs only; no code yet.
-**Next:** implementation plan (writing-plans) → build.
+**Current:** v1 implementation complete on `feat/v1-footer` — footer (model/git/tokens/ctx%/statuses/quota), z.ai quota poller, `/statusline` notify-based commands. Design A1–A7 (A3″/A4′/A5-refined) locked; z.ai quota API confirmed.
+**Next:** final merge of `feat/v1-footer`, then deferred follow-ups (interactive TUI panel, Task 8 offline fast-path).
 
 ## Read first
 

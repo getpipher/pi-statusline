@@ -14,7 +14,8 @@
 - TDD mandatory; `pnpm test:run` (node:test via tsx) after changes; `pnpm typecheck` clean. No build step (raw .ts via tsx at pi runtime).
 - Secrets: read `zai.key` from `~/.pi/agent/auth.json` in-process; never log/echo/commit it. `.env`/auth.json never committed.
 - z.ai quota API: `GET https://api.z.ai/api/monitor/usage/quota/limit` with `Authorization: Bearer <zai inference key>` → 200 `{ data: { limits: [...], level: "lite"|"pro"|"max" } }`. `nextResetTime` = ms-epoch UTC. Same Bearer perimeter as inference. Zero credit cost to poll.
-- Key access: `~/.pi/agent/auth.json` → `zai.key.key` (object: `{"zai":{"type":"api_key","key":"<value>"}}`). Read in-process, never log.
+- Key access: `~/.pi/agent/auth.json` → top-level `"zai"` object → its `key` field (`{"zai":{"type":"api_key","key":"<value>"}}`; the extension reads `zai.key`, one level — not `zai.key.key`). Read in-process, never log.
+- Tier override (`zai.tier`) is RESERVED for the deferred offline fast-path (Task 8) — v1 auto-detects the tier from `data.level`; `/statusline tier` only persists the override.
 - Per-message usage shape: `{ input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost: { ..., total: 0 } }`. Cached-token field is `cacheRead` (camelCase).
 - pi footer API: `ctx.ui.setFooter((tui, theme, footerData) => ({ render(width): string[], dispose?, invalidate? }))`. `footerData.getGitBranch()`, `footerData.getExtensionStatuses(): ReadonlyMap<string,string>`, `footerData.onBranchChange(cb): unsubscribe`. `theme.fg(color, text)`/`theme.bg(color, text)`; colors: text accent muted dim success warning error toolTitle. `tui.requestRender()` to invalidate.
 - `truncateToWidth` / `visibleWidth` from `@earendil-works/pi-tui`.
