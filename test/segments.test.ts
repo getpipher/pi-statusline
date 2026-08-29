@@ -51,8 +51,16 @@ test("renderTokensSegment formats input/output", () => {
   assert.ok(result.includes("↓700"), `output total: ${result}`);
 });
 
-test("renderContextSegment formats percentage", () => {
-  assert.equal(renderContextSegment({ tokens: 50000, maxTokens: 200000 }), "25%");
+test("renderContextSegment uses pi's precomputed percent", () => {
+  assert.equal(renderContextSegment({ tokens: 50000, contextWindow: 200000, percent: 24.6 }), "25%");
+});
+
+test("renderContextSegment derives percent when pi reports percent as null", () => {
+  assert.equal(renderContextSegment({ tokens: 50000, contextWindow: 200000, percent: null }), "25%");
+});
+
+test("renderContextSegment omits unknown context usage", () => {
+  assert.equal(renderContextSegment({ tokens: null, contextWindow: 200000, percent: null }), "");
   assert.equal(renderContextSegment(null), "");
 });
 

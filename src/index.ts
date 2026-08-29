@@ -80,8 +80,7 @@ export default function (pi: ExtensionAPI): void {
 
           let ctxPct = "";
           if (config.display.showContext) {
-            const usage = ctx.getContextUsage();
-            ctxPct = renderContextSegment(usage ? { tokens: usage.tokens ?? 0, maxTokens: (usage as { maxTokens?: number }).maxTokens ?? 0 } : null);
+            ctxPct = renderContextSegment(ctx.getContextUsage());
           }
 
           // A5 quota dimming: bright when the session draws on the z.ai plan,

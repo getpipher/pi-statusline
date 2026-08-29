@@ -1,11 +1,15 @@
 // src/segments/context.ts
 export interface ContextUsage {
-  tokens: number;
-  maxTokens: number;
+  tokens: number | null;
+  contextWindow: number;
+  percent: number | null;
 }
 
 export function renderContextSegment(usage: ContextUsage | null | undefined): string {
-  if (!usage || !usage.maxTokens || usage.maxTokens <= 0) return "";
-  const pct = Math.round((usage.tokens / usage.maxTokens) * 100);
-  return `${pct}%`;
+  if (!usage) return "";
+  if (usage.percent !== null && Number.isFinite(usage.percent)) {
+    return `${Math.round(usage.percent)}%`;
+  }
+  if (usage.tokens === null || usage.contextWindow <= 0) return "";
+  return `${Math.round((usage.tokens / usage.contextWindow) * 100)}%`;
 }
