@@ -1022,100 +1022,99 @@ git commit -m "feat: config v2 — display.rows registry order, bars/sparkline g
 
 - [ ] **Step 1: Write the failing test `test/rows-registry.test.ts`**
 
-Use synthetic rows with predictable fragment widths (each `x` = 1 column via `visibleWidth`-measurable plain text):
+Synthetic rows render one single-char fragment per column (each `x` = 1 column), so the tail-trim phase can actually reduce a line's width — real rows are fragment-rich the same way. The snapshot carries `order` exactly as written below; do not reshape. `renderRows(registry, order, snapshot)` signature is fixed.
 
 ```ts
 // test/rows-registry.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { Fragment } from "../src/types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "../src/rows/registry.ts";
 
-function fakeRow(id: string, priority: 1 | 2 | 3, text: string): Row {
+function fakeRow(id: Row["id"], priority: 1 | 2 | 3, text: string): Row {
   return {
-    id: id as Row["id"],
+    id,
     priority,
-    render: (): Fragment[] => [{ text, color: "muted" }],
+    render: () => text.split("").map((ch) => ({ text: ch, color: "muted" as const })),
   };
 }
 
-function makeSnapshot(width: number, order: string[]): RowSnapshot {
+// widths: identity=4, ctx=4, money=7, quota=8, ambient=4 — quota is the widest
+// priority-2 row, so the reverse-display tie-break (quota drops before money) is
+// end-state observable at width 7.
+const REGISTRY = createRowRegistry([
+  fakeRow("identity", 1, "xxxx"),
+  fakeRow("ctx", 1, "xxxx"),
+  fakeRow("money", 2, "xxxxxxx"),
+  fakeRow("quota", 2, "xxxxxxxx"),
+  fakeRow("ambient", 3, "xxxx"),
+]);
+const ORDER = ["identity", "ctx", "money", "quota", "ambient"] as const;
+
+function makeSnapshot(width: number): RowSnapshot {
   return {
     now: 0,
     width,
-    order,
     session: null as never,
     ledger: null as never,
     statuses: "",
     config: null as never,
+    order: [...ORDER],
   };
 }
 
-// widths: identity=10, ctx=5, money=8, quota=6, ambient=4
-const REGISTRY = createRowRegistry([
-  fakeRow("identity", 1, "x".repeat(10)),
-  fakeRow("ctx", 1, "x".repeat(5)),
-  fakeRow("money", 2, "x".repeat(8)),
-  fakeRow("quota", 2, "x".repeat(6)),
-  fakeRow("ambient", 3, "x".repeat(4)),
-]);
-const ORDER = ["identity", "ctx", "money", "quota", "ambient"] as RowSnapshot["order"];
-
-function ids(lines: ReturnType<typeof renderRows>, registry = REGISTRY): string[] {
-  return lines.map((frags) => frags.map((f) => f.text).join(""));
+function ids(rendered: ReturnType<typeof renderRows>): string[] {
+  return rendered.map((frags) => frags.map((f) => f.text).join(""));
 }
 
-test("all rows render when width accommodates the widest line", () => {
-  const lines = renderRows(REGISTRY, ORDER, makeSnapshot(20, ORDER));
-  assert.deepEqual(ids(lines), ["xxxxxxxxxx", "xxxxx", "xxxxxxxx", "xxxxxx", "xxxx"]);
+test("all rows render untrimmed when width accommodates the widest line", () => {
+  assert.deepEqual(ids(renderRows(REGISTRY, [...ORDER], makeSnapshot(20))),
+    ["xxxx", "xxxx", "xxxxxxx", "xxxxxxxx", "xxxx"]);
 });
 
 test("null render omits a row without breaking others", () => {
   const registry = createRowRegistry([
     { id: "identity", priority: 1, render: () => null },
-    fakeRow("ctx", 1, "xxxxx"),
+    fakeRow("ctx", 1, "xxxx"),
   ]);
-  const lines = renderRows(registry, ["identity", "ctx"], makeSnapshot(50, ["identity", "ctx"]));
-  assert.deepEqual(ids(lines), ["xxxxx"]);
+  assert.deepEqual(ids(renderRows(registry, ["identity", "ctx"], makeSnapshot(50))), ["xxxx"]);
 });
 
-test("drop matrix: ambient (priority 3) drops first, then quota before money (reverse display order tie-break)", () => {
-  // widest row = identity (10). width 9 → must drop until all lines ≤ 9.
-  // drop order: ambient(3) → quota(2, later in display) → money(2) → then trim priority-1.
-  assert.deepEqual(ids(renderRows(REGISTRY, ORDER, makeSnapshot(9, ORDER))), ["xxxxxxxxxx", "xxxxx", "xxxxxxxx"]);
-  assert.deepEqual(ids(renderRows(REGISTRY, ORDER, makeSnapshot(8, ORDER))), ["xxxxxxxxxx", "xxxxx", "xxxxxxxx"]);
-  // width 7: money (8) still overflows → dropped too
-  assert.deepEqual(ids(renderRows(REGISTRY, ORDER, makeSnapshot(7, ORDER))), ["xxxxxxxxxx", "xxxxx"]);
+test("drop matrix: ambient (priority 3) drops first; tie-break drops quota before money", () => {
+  // width 7: only quota (8) overflows. ambient is sacrificed first (priority 3) even
+  // though it fits, then the p2 tie-break drops the LATER display row (quota) — money survives.
+  assert.deepEqual(ids(renderRows(REGISTRY, [...ORDER], makeSnapshot(7))),
+    ["xxxx", "xxxx", "xxxxxxx"]);
+});
+
+test("money drops after quota when both must go (width 4)", () => {
+  assert.deepEqual(ids(renderRows(REGISTRY, [...ORDER], makeSnapshot(4))), ["xxxx", "xxxx"]);
 });
 
 test("priority-1 rows are never dropped as whole rows — they tail-trim instead", () => {
-  const lines = renderRows(REGISTRY, ORDER, makeSnapshot(4, ORDER));
-  const joined = ids(lines);
-  assert.ok(joined.includes("xxxxxxxxxx".slice(0, 4)) === false || true); // identity may be trimmed
-  // identity and ctx still present (at least 1 fragment each), ambient/money/quota gone
-  assert.equal(joined.length, 2);
-  assert.ok(joined[0]!.length >= 1 && visibleWidth(joined[0]!) <= 4);
-  assert.ok(joined[1]!.length >= 1 && visibleWidth(joined[1]!) <= 4);
+  const rendered = ids(renderRows(REGISTRY, [...ORDER], makeSnapshot(2)));
+  assert.equal(rendered.length, 2); // identity + ctx survive at every width
+  for (const line of rendered) {
+    assert.ok(line.length >= 1, "trim keeps at least one fragment");
+    assert.ok(visibleWidth(line) <= 2);
+  }
 });
 
 test("unregistered known ids in order (deen in P1) are skipped silently", () => {
-  const lines = renderRows(REGISTRY, [...ORDER, "deen"] as RowSnapshot["order"], makeSnapshot(50, ORDER));
-  assert.equal(lines.length, 5);
+  assert.equal(renderRows(REGISTRY, [...ORDER, "deen"], makeSnapshot(50)).length, 5);
 });
 
 test("every returned line fits the width after trimming", () => {
   for (let w = 1; w <= 20; w++) {
-    const lines = renderRows(REGISTRY, ORDER, makeSnapshot(w, ORDER));
-    for (const frags of lines) {
-      assert.ok(visibleWidth(frags.map((f) => f.text).join("")) <= w, `width ${w} exceeded`);
+    const rendered = renderRows(REGISTRY, [...ORDER], makeSnapshot(w));
+    for (const frags of rendered) {
+      const lineWidth = visibleWidth(frags.map((f) => f.text).join(""));
+      assert.ok(lineWidth <= w, `width ${w} exceeded by line of ${lineWidth}`);
     }
-    assert.ok(lines.length >= 1, `width ${w} produced zero lines`);
+    assert.ok(rendered.length >= 1, `width ${w} produced zero lines`);
   }
 });
 ```
-
-> If `RowSnapshot.order` feels awkward, alternative shape: pass `order` as the second arg only and keep the snapshot data-only (`now, width, session, ledger, statuses, config`). Pick ONE — the test above uses `order` inside the snapshot; if you drop it from the snapshot, update the test's `makeSnapshot` accordingly (remove `order` field and pass order positionally as it already is). The `renderRows(registry, order, snapshot)` signature is fixed.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1324,8 +1323,10 @@ test("ambient row: clock, coding span, extension statuses — all dim", () => {
 
 test("ambient row: clock is rendered from snapshot.now in local time", () => {
   const row = createAmbientRow();
+  const d = new Date(Date.UTC(2026, 7, 30, 4, 12)); // same instant as the snap() fixture
+  const expected = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const out = plain(row.render(snap({ statuses: "" })));
-  assert.ok(out.startsWith("04:12") || /"[0-9]{2}:[0-9]{2}"/.test(JSON.stringify(out.slice(0, 5))));
+  assert.ok(out.startsWith(expected), `expected clock ${expected}, got: ${out}`);
   assert.ok(out.includes(" · coding 3h12m"));
   assert.ok(!out.endsWith(" ·")); // no dangling separator when statuses empty
 });
@@ -1444,7 +1445,7 @@ test("ctx row: bar + percent + window + tokens + cache hit", () => {
     { text: " 34%", color: "muted" },
     { text: " 68k/200k", color: "muted" },
     { text: " · ↑48k ↓6.2k", color: "muted" },
-    { text: " · cache 62%", color: "muted" },
+    { text: " · cache 68%", color: "muted" },
   ]);
 });
 
@@ -1459,13 +1460,11 @@ test("ctx row: bar tints warning at ≥70% and error at ≥90%", () => {
 test("ctx row: cache hit uses cacheRead/(cacheRead+input); omitted when denominator 0", () => {
   const row = createContextRow();
   const out = plain(row.render(snap({ session: CTX_SESSION })));
-  assert.ok(out.includes("cache 62%")); // 100k/(100k+48k) ≈ 67.5 → 68? see note
+  assert.ok(out.includes("cache 68%")); // 100_000/(100_000+48_000) = 0.6757… → Math.round → 68
   const zero = row.render(snap({ session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 } }) }));
   assert.ok(!plain(zero).includes("cache"));
 });
 ```
-
-> **Fix the expected cache number before running:** the test must assert the EXACT value the formula produces for the fixture. `100_000 / (100_000 + 48_000) = 0.6757… → Math.round → 68`. Write `cache 68%` in the assertion (and fix the comment). The 62% figure in the spec mock is illustrative, not fixture-derived.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -1567,18 +1566,17 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
   }))!;
+  // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → levels round(v/max*6) → ▂▂▃▅▃▂▇.
+  // Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
   assert.deepEqual(frags, [
     { text: "$", color: "dim" },
     { text: " 1.24 sess", color: "muted" },
     { text: " · 8.40 day", color: "muted" },
     { text: " · 31.20 7d", color: "muted" },
     { text: " · 118.75 30d", color: "muted" },
-    { text: " ▁▂▃▅▃▂▇", color: "accent" },
-    { text: " · $2.10/hr", color: "muted" },
+    { text: " ▂▂▃▅▃▂▇", color: "accent" },
+    { text: " · $0.39/hr", color: "muted" },
   ]);
-  // burn = session cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → but fixture span is
-  // 3h12m → 1.24/(3.2) = 0.39/hr. Fix the expected string to the exact computed value:
-  // Math: 1.24 / ((3*60+12)/60) = 1.24 / 3.2 = 0.3875 → "0.39/hr". Assert " · $0.39/hr".
 });
 
 test("money row: burn rate renders — when fewer than 2 usage entries", () => {
@@ -1600,8 +1598,6 @@ test("money row: sparkline omitted when display.sparkline=false", () => {
   assert.ok(!plain(row.render(cfgSnap)).includes("▁"));
 });
 ```
-
-> **Fix the expected burn string before running:** with the fixture span (3h12m) and cost (1.24), burn = `1.24 / 3.2 = 0.3875` → `formatMoney` → `0.39`. The full fragment is ` · $0.39/hr`. Replace the placeholder comment with that exact assertion — the spec's `$2.10/hr` is illustrative, not fixture-derived.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -2435,6 +2431,6 @@ Expected: release.yml publishes `@getpipher/pi-statusline@0.2.0` on the `v0.2.0`
 ## Self-Review (performed at plan-writing time)
 
 1. **Spec coverage (§12 P1 scope):** row registry + multi-line + drop matrix + ticker (Tasks 5, 10, 11) · SessionStore (Task 2) · LedgerStore (Task 3) · identity/ctx/money/ambient rows (Tasks 6–8) · ZaiAdapter migration with format change to the §5 target (Task 9) · config v2 + back-compat (Task 4) — all covered. Perf budget smoke (§11) in Task 11 step 1.7. P2/P3 items (deen, OpenRouter, MCP, git upgrades, named themes, `rows` cmd) deliberately absent.
-2. **Placeholder scan:** two fixtures in early test drafts carried illustrative numbers from the spec mock (`cache 62%`, `$2.10/hr`); both are flagged IN-STEP with the exact arithmetic to assert (`cache 68%`; `$0.39/hr`) — implementers must assert the computed value, not the mock.
+2. **Placeholder scan:** no placeholders remain; illustrative spec-mock numbers (`cache 62%`, `$2.10/hr`) were replaced by fixture-derived values (`cache 68%`, `$0.39/hr`, sparkline `▂▂▃▅▃▂▇`) and the Task 5 drop-matrix expectations were recomputed to match the algorithm exactly (verified by hand-simulation before dispatch).
 3. **Type consistency:** `Fragment[]` flows from rows → `renderRows` → theme pass (Task 11); `RowSnapshot` fields (`now/width/session/ledger/statuses/config`) match every row task's fixture builder; `ProviderRowAdapter<D>` matches between types/zai/quota/wiring; `loadConfig` result destructure used identically in Tasks 4 and 11; ledger `LedgerSnapshot.daily` feeds `renderSparkline(values)` oldest→newest as the formatter expects.
 4. **Known deliberate deviations from spec prose (flagged, not silent):** (a) adapter contract uses `current()/start()/stop()` alongside the spec's `fetch(store)/render` — the `StoreHandle` was never concretely specified; this shape reuses v1's tested poller seam; (b) ledger lines record `provider/model` as `"unknown"` in P1 (pi usage entries carry no per-entry attribution); (c) `display.bars` gates the ctx row's bar; the zai quota bar is inherent to its format string; (d) `deen` is config-known but unregistered in P1 — silently skipped, no notify.
