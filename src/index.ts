@@ -51,6 +51,10 @@ export default function (pi: ExtensionAPI): void {
         dispose: () => {
           unsub();
           stopPoller();
+          // pi may dispose the footer at session end — clear the install guard so the
+          // next session_start reinstalls (and the stale render fn can't fire after dispose).
+          footerInstalled = false;
+          requestRenderFn = null;
         },
         invalidate() {
           tui.requestRender();
