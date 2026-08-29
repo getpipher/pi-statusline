@@ -19,7 +19,7 @@
 - Per-message usage shape: `{ input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost: { ..., total: 0 } }`. Cached-token field is `cacheRead` (camelCase).
 - pi footer API: `ctx.ui.setFooter((tui, theme, footerData) => ({ render(width): string[], dispose?, invalidate? }))`. `footerData.getGitBranch()`, `footerData.getExtensionStatuses(): ReadonlyMap<string,string>`, `footerData.onBranchChange(cb): unsubscribe`. `theme.fg(color, text)`/`theme.bg(color, text)`; colors: text accent muted dim success warning error toolTitle. `tui.requestRender()` to invalidate.
 - `truncateToWidth` / `visibleWidth` from `@earendil-works/pi-tui`.
-- A5-refined: ALWAYS render our footer. z.ai quota segment is subscription-scoped (shown when zai key exists, dimmed when active provider ≠ zai). Session segment is active-provider-scoped. Never yield to native. Truncation order (drop right→left): quota → ctx% → tokens → git; always keep model badge.
+- A5-refined: ALWAYS render our footer. z.ai quota segment is subscription-scoped (shown when zai key exists, dimmed when active provider ≠ zai). Session segment is active-provider-scoped. Never yield to native. Truncation order (drop right→left): quota → statuses → ctx% → tokens → git; always keep model badge. (statuses stage added in final fix wave — H1)
 
 ---
 

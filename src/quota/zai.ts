@@ -74,6 +74,7 @@ export function parseQuotaResponse(body: string): QuotaResult | null {
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== "object") return null; // literal JSON null / primitives
 
   if (parsed.code !== 200 || parsed.success !== true) return null;
 
