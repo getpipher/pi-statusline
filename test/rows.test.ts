@@ -85,3 +85,42 @@ test("ambient row: clock is rendered from snapshot.now in local time", () => {
   assert.ok(out.includes(" · coding 3h12m"));
   assert.ok(!out.endsWith(" ·")); // no dangling separator when statuses empty
 });
+
+// ── Task 7: context (ctx) row ──
+import { createContextRow } from "../src/rows/context.ts";
+
+const CTX_SESSION = session({
+  usage: { input: 48_000, output: 6200, cacheRead: 100_000, cacheWrite: 0, cost: 0, count: 5 },
+  contextTokens: 68_000,
+  contextWindow: 200_000,
+  contextPercent: 34,
+});
+
+test("ctx row: bar + percent + window + tokens + cache hit", () => {
+  const row = createContextRow();
+  const frags = row.render(snap({ session: CTX_SESSION }))!;
+  assert.deepEqual(frags, [
+    { text: "ctx", color: "dim" },
+    { text: " ▕███░░░░░░░▏", color: "muted" },
+    { text: " 34%", color: "muted" },
+    { text: " 68k/200k", color: "muted" },
+    { text: " · ↑48k ↓6.2k", color: "muted" },
+    { text: " · cache 68%", color: "muted" },
+  ]);
+});
+
+test("ctx row: bar tints warning at ≥70% and error at ≥90%", () => {
+  const row = createContextRow();
+  const warn = row.render(snap({ session: { ...CTX_SESSION, contextPercent: 75 } }))!;
+  assert.equal(warn[1]!.color, "warning");
+  const err = row.render(snap({ session: { ...CTX_SESSION, contextPercent: 91 } }))!;
+  assert.equal(err[1]!.color, "error");
+});
+
+test("ctx row: cache hit uses cacheRead/(cacheRead+input); omitted when denominator 0", () => {
+  const row = createContextRow();
+  const out = plain(row.render(snap({ session: CTX_SESSION })));
+  assert.ok(out.includes("cache 68%")); // 100_000/(100_000+48_000) = 0.6757… → Math.round → 68
+  const zero = row.render(snap({ session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 } }) }));
+  assert.ok(!plain(zero).includes("cache"));
+});
