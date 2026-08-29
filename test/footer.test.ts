@@ -8,12 +8,13 @@ import type { StatuslineConfig } from "../src/config.ts";
 const cfg: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
-  display: { showTokens: true, showContext: true, showGit: true },
+  display: { showTokens: true, showContext: true, showGit: true, showSession: true },
 };
 
 function input(overrides: Partial<Parameters<typeof composeSegments>[0]> = {}): Parameters<typeof composeSegments>[0] {
   return {
     modelId: "glm-5.2",
+    sessionName: "statusline-v2",
     gitBranch: "main",
     tokens: "↑1.5k ↓700",
     ctxPct: "42%",
@@ -27,7 +28,7 @@ function input(overrides: Partial<Parameters<typeof composeSegments>[0]> = {}): 
 test("composeSegments produces the canonical segment order", () => {
   assert.deepEqual(
     composeSegments(input()),
-    ["glm-5.2", "main", "↑1.5k ↓700", "42%", "fleet ready"],
+    ["glm-5.2", "statusline-v2", "main", "↑1.5k ↓700", "42%", "fleet ready"],
   );
 });
 
@@ -41,7 +42,7 @@ test("composeSegments includes quota as the last segment", () => {
 test("composeSegments surfaces neighboring extension statuses", () => {
   const segs = composeSegments(input({ statuses: "fleet ready · memory warm" }));
   assert.ok(segs.includes("fleet ready · memory warm"));
-  assert.equal(segs.indexOf("fleet ready · memory warm"), 4);
+  assert.equal(segs.indexOf("fleet ready · memory warm"), 5);
 });
 
 test("composeSegments omits git when display.showGit=false", () => {
@@ -59,7 +60,19 @@ test("composeSegments omits context when display.showContext=false", () => {
   assert.ok(!composeSegments(input({ config })).includes("42%"));
 });
 
-test("truncateSegments drops quota, then statuses, before context", () => {
+test("composeSegments omits session when display.showSession=false", () => {
+  const config = { ...cfg, display: { ...cfg.display, showSession: false } };
+  assert.ok(!composeSegments(input({ config })).includes("statusline-v2"));
+});
+
+test("composeSegments omits an empty session name", () => {
+  assert.deepEqual(
+    composeSegments(input({ sessionName: "" })),
+    ["glm-5.2", "main", "↑1.5k ↓700", "42%", "fleet ready"],
+  );
+});
+
+ test("truncateSegments drops quota, then statuses, before context", () => {
   const segs = ["model", "git", "tokens", "ctx", "statuses", "quota"];
   assert.deepEqual(truncateSegments(segs, 29), ["model", "git", "tokens", "ctx", "statuses"]);
   assert.deepEqual(truncateSegments(segs, 20), ["model", "git", "tokens", "ctx"]);

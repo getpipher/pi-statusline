@@ -5,6 +5,7 @@ import { renderModelSegment } from "./segments/model.ts";
 
 export interface FooterRenderInput {
   modelId: string | undefined;
+  sessionName: string;
   gitBranch: string | null;
   tokens: string;
   ctxPct: string;
@@ -23,6 +24,11 @@ export function composeSegments(input: FooterRenderInput): string[] {
   // Model badge — always present (index 0). renderModelSegment is the canonical formatter
   // (strips provider prefix + :variant suffix; "no-model" fallback for undefined).
   parts.push(renderModelSegment(input.modelId));
+
+  // Session name — the "what am I working on" identity (/name); omitted when unset.
+  if (input.config.display.showSession && input.sessionName) {
+    parts.push(input.sessionName);
+  }
 
   // Git branch
   if (input.config.display.showGit && input.gitBranch) {

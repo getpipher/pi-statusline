@@ -1,0 +1,53 @@
+<h2>The hybrid — "Editorial Dashboard"</h2>
+<p class="subtitle">C's labeled-row skeleton (scales to any component count) + B's editorial skin (hierarchy without chrome). Proof below: the SAME skeleton serving two different providers. Rows are modules — the zai row and the or row are the same slot, different adapter.</p>
+
+<div class="section">
+  <div class="label">Session 1 — zai user (what you see daily)</div>
+  <div style="background:#11111b;border:1px solid #313244;border-radius:8px;padding:14px 18px;font-family:ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;font-size:11.5px;line-height:1.8;overflow-x:auto">
+<span style="color:#cdd6f4;font-weight:700">statusline-v2</span> <span style="color:#6c7086">—</span> <span style="color:#89b4fa">~/local-dev/getpipher/pi-statusline</span> <span style="color:#a6e3a1">⎇ main</span> <span style="color:#6c7086">·</span> <span style="color:#89dceb">glm-5.3-flash</span><br>
+<span style="color:#6c7086">ctx  </span><span style="color:#45475a">▕</span><span style="color:#f9e2af">███████</span><span style="color:#313244">░░░░░░░</span><span style="color:#45475a">▏</span> <span style="color:#f9e2af">34%</span>  <span style="color:#6c7086">68k/200k · ↑48k ↓6.2k · cache 62%</span><br>
+<span style="color:#6c7086">$    </span><span style="color:#cdd6f4">1.24</span> <span style="color:#585b70">sess</span> <span style="color:#a6adc8">8.40</span> <span style="color:#585b70">day</span> <span style="color:#a6adc8">31.20</span> <span style="color:#585b70">7d</span> <span style="color:#a6adc8">118.75</span> <span style="color:#585b70">30d</span>  <span style="color:#a6e3a1">▁▂▃▅▃▂</span> <span style="color:#fab387">$2.10/hr</span><br>
+<span style="color:#6c7086">zai  </span><span style="color:#45475a">▕</span><span style="color:#fab387">██████████</span><span style="color:#313244">░░░</span><span style="color:#45475a">▏</span> <span style="color:#fab387">75%</span>  <span style="color:#6c7086">1.5k/2.0k 5h · wk 12% · reset 2h55m</span><br>
+<span style="color:#6c7086">deen </span><span style="color:#f5c2e7">Dhuhr 11:53</span> <span style="color:#a6e3a1">in 2h41m</span> <span style="color:#585b70">· Fajr ✓ ·</span> <span style="color:#cba6f7">17 Rabīʿ al-awwal 1448</span> <span style="color:#585b70">·</span> <span style="color:#6c7086">Jakarta</span><br>
+<span style="color:#585b70">MCP 26/26 · 04:12 · coding 3h12m</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Session 2 — OpenRouter user (same skeleton, adapter swapped — deen row untouched)</div>
+  <div style="background:#11111b;border:1px solid #313244;border-radius:8px;padding:14px 18px;font-family:ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;font-size:11.5px;line-height:1.8;overflow-x:auto">
+<span style="color:#cdd6f4;font-weight:700">or-migration</span> <span style="color:#6c7086">—</span> <span style="color:#89b4fa">~/local-dev/sip-protocol/sip-protocol</span> <span style="color:#a6e3a1">⎇ feat/or-adapter</span> <span style="color:#6c7086">·</span> <span style="color:#89dceb">claude-opus-4.6</span><br>
+<span style="color:#6c7086">ctx  </span><span style="color:#45475a">▕</span><span style="color:#a6e3a1">████</span><span style="color:#313244">░░░░░░░░░░░</span><span style="color:#45475a">▏</span> <span style="color:#a6e3a1">18%</span>  <span style="color:#6c7086">92k/500k · ↑84k ↓8.1k · cache 74%</span><br>
+<span style="color:#6c7086">$    </span><span style="color:#cdd6f4">14.02</span> <span style="color:#585b70">sess</span> <span style="color:#a6adc8">41.20</span> <span style="color:#585b70">day</span> <span style="color:#a6adc8">96.40</span> <span style="color:#585b70">7d</span> <span style="color:#a6adc8">310.11</span> <span style="color:#585b70">30d</span>  <span style="color:#a6e3a1">▂▃▃▅▆▅</span> <span style="color:#fab387">$12.40/hr</span><br>
+<span style="color:#6c7086">or   </span><span style="color:#a6e3a1">$87.20</span> <span style="color:#6c7086">credits left · $12.80 today · top: opus-4.6 $9.10</span><br>
+<span style="color:#6c7086">deen </span><span style="color:#f5c2e7">Dhuhr 11:53</span> <span style="color:#a6e3a1">in 2h41m</span> <span style="color:#585b70">· Fajr ✓ ·</span> <span style="color:#cba6f7">17 Rabīʿ al-awwal 1448</span> <span style="color:#585b70">·</span> <span style="color:#6c7086">Jakarta</span><br>
+<span style="color:#585b70">MCP 26/26 · 04:12 · coding 1h02m</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="label">Session 3 — Ollama (local, free — money row still works, quota row absent)</div>
+  <div style="background:#11111b;border:1px solid #313244;border-radius:8px;padding:14px 18px;font-family:ui-monospace,'JetBrains Mono','SF Mono',Menlo,monospace;font-size:11.5px;line-height:1.8;overflow-x:auto">
+<span style="color:#cdd6f4;font-weight:700">local-experiment</span> <span style="color:#6c7086">—</span> <span style="color:#89b4fa">~/local-dev/scratch/vision-test</span> <span style="color:#a6e3a1">⎇ main</span> <span style="color:#6c7086">·</span> <span style="color:#89dceb">qwen3-coder:30b</span><br>
+<span style="color:#6c7086">ctx  </span><span style="color:#45475a">▕</span><span style="color:#a6e3a1">███</span><span style="color:#313244">░░░░░░░░░░░░</span><span style="color:#45475a">▏</span> <span style="color:#a6e3a1">12%</span>  <span style="color:#6c7086">24k/200k · ↑22k ↓1.8k</span><br>
+<span style="color:#6c7086">$    </span><span style="color:#a6e3a1">$0.00</span> <span style="color:#585b70">everywhere — local inference</span><br>
+<span style="color:#6c7086">deen </span><span style="color:#f5c2e7">Dhuhr 11:53</span> <span style="color:#a6e3a1">in 2h41m</span> <span style="color:#585b70">· Fajr ✓ ·</span> <span style="color:#cba6f7">17 Rabīʿ al-awwal 1448</span> <span style="color:#585b70">·</span> <span style="color:#6c7086">Jakarta</span><br>
+<span style="color:#585b70">MCP 26/26 · 04:12 · coding 0h47m</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="pros-cons">
+    <div class="pros"><h4>Why this scales</h4><ul>
+      <li>Rows = modules: add <code>git</code>, <code>pr</code>, <code>wellness</code>, <code>focus</code> rows without touching existing ones</li>
+      <li>Provider adapter contract: <code>matches(provider) → rows</code> — zai today, openrouter/or/anthropic tomorrow</li>
+      <li>$ row is universal (pi computes real cost per provider — no pricing-table rot like CC's bash)</li>
+      <li>Responsive: drop whole rows by priority first, then trim fragments</li>
+    </ul></div>
+    <div class="cons"><h4>Open points (next questions)</h4><ul>
+      <li>Line budget: 5–6 rows max, or configurable per-row like CC's 1–9?</li>
+      <li>Does the deen row deserve always-on priority, or context-sensitive (near prayer time → bright)?</li>
+      <li>OpenRouter adapter scope: credits-only, or top-model breakdown?</li>
+    </ul></div>
+  </div>
+</div>

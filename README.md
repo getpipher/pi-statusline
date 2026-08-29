@@ -22,7 +22,7 @@ In `~/.pi/agent/settings.json`:
 {
   "enabled": true,
   "zai": { "tier": "auto", "pollIntervalMs": 180000 },
-  "display": { "showTokens": true, "showContext": true, "showGit": true }
+  "display": { "showTokens": true, "showContext": true, "showGit": true, "showSession": true }
 }
 ```
 

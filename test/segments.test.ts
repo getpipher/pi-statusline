@@ -8,7 +8,19 @@ import { renderGitSegment } from "../src/segments/git.ts";
 import { renderTokensSegment, formatTokenCount } from "../src/segments/tokens.ts";
 import { renderContextSegment } from "../src/segments/context.ts";
 import { renderQuotaSegment } from "../src/segments/quota.ts";
+import { renderSessionSegment } from "../src/segments/session.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
+
+test("renderSessionSegment returns the trimmed session name", () => {
+  assert.equal(renderSessionSegment("statusline-v2"), "statusline-v2");
+  assert.equal(renderSessionSegment("  padded name  "), "padded name");
+});
+
+test("renderSessionSegment returns empty for undefined or blank names", () => {
+  assert.equal(renderSessionSegment(undefined), "");
+  assert.equal(renderSessionSegment(""), "");
+  assert.equal(renderSessionSegment("   "), "");
+});
 
 test("detectProvider extracts prefixes but bare pi model ids have no provider", () => {
   assert.equal(detectProvider("zai/glm-5.2"), "zai");

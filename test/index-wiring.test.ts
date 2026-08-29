@@ -88,6 +88,7 @@ test("entry wiring uses real pi model, usage, token, status, and command shapes"
     model,
     sessionManager: {
       getEntries: () => entries,
+      getSessionName: () => "wiring-smoke",
       getBranch: () => { throw new Error("token totals must use getEntries()"); },
     },
     getContextUsage: () => ({ tokens: 50_000, contextWindow: 200_000, percent: 25 }),
@@ -128,6 +129,7 @@ test("entry wiring uses real pi model, usage, token, status, and command shapes"
 
     const line = footerHolder.current.render(500)[0] ?? "";
     assert.match(line, /glm-5\.2/);
+    assert.match(line, /wiring-smoke/);
     assert.match(line, /↑1\.5k ↓700/);
     assert.match(line, /25%/);
     assert.match(line, /fleet ready · memory warm/);

@@ -12,13 +12,14 @@ export interface StatuslineConfig {
     showTokens: boolean;
     showContext: boolean;
     showGit: boolean;
+    showSession: boolean;
   };
 }
 
 export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
-  display: { showTokens: true, showContext: true, showGit: true },
+  display: { showTokens: true, showContext: true, showGit: true, showSession: true },
 };
 
 const VALID_TIERS = ["auto", "lite", "pro", "max"] as const;
@@ -63,6 +64,7 @@ export function loadConfig(path: string): StatuslineConfig {
     if (typeof d.showTokens === "boolean") cfg.display.showTokens = d.showTokens;
     if (typeof d.showContext === "boolean") cfg.display.showContext = d.showContext;
     if (typeof d.showGit === "boolean") cfg.display.showGit = d.showGit;
+    if (typeof d.showSession === "boolean") cfg.display.showSession = d.showSession;
   }
 
   return cfg;

@@ -9,6 +9,7 @@ import { isZaiProvider } from "./provider.ts";
 import { renderTokensSegment } from "./segments/tokens.ts";
 import { renderContextSegment } from "./segments/context.ts";
 import { renderQuotaSegment } from "./segments/quota.ts";
+import { renderSessionSegment } from "./segments/session.ts";
 import { composeSegments, truncateSegments } from "./footer.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
@@ -116,6 +117,9 @@ export function activateStatusline(
           // never re-split a joined string (quota segment contains spaces).
           const segs = composeSegments({
             modelId,
+            sessionName: config.display.showSession
+              ? renderSessionSegment(ctx.sessionManager.getSessionName?.())
+              : "",
             gitBranch: branch,
             tokens: tokensStr,
             ctxPct,

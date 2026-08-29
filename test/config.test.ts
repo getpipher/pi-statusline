@@ -21,7 +21,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
   assert.deepEqual(DEFAULT_CONFIG, {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
-    display: { showTokens: true, showContext: true, showGit: true },
+    display: { showTokens: true, showContext: true, showGit: true, showSession: true },
   });
 });
 
@@ -41,7 +41,7 @@ test("loadConfig reads a valid file", () => {
   writeFileSync(path, JSON.stringify({
     enabled: false,
     zai: { tier: "pro", pollIntervalMs: 60_000 },
-    display: { showTokens: false, showContext: true, showGit: false },
+    display: { showTokens: false, showContext: true, showGit: false, showSession: true },
   }));
   const cfg = loadConfig(path);
   assert.equal(cfg.enabled, false);
@@ -49,6 +49,7 @@ test("loadConfig reads a valid file", () => {
   assert.equal(cfg.zai.pollIntervalMs, 60_000);
   assert.equal(cfg.display.showTokens, false);
   assert.equal(cfg.display.showGit, false);
+  assert.equal(cfg.display.showSession, true);
 });
 
 test("loadConfig merges defaults for missing keys", () => {
@@ -59,6 +60,7 @@ test("loadConfig merges defaults for missing keys", () => {
   assert.equal(cfg.zai.tier, "auto");         // defaulted
   assert.equal(cfg.zai.pollIntervalMs, 180_000); // defaulted
   assert.equal(cfg.display.showTokens, true);  // defaulted
+  assert.equal(cfg.display.showSession, true); // defaulted
 });
 
 test("loadConfig rejects invalid tier value", () => {
