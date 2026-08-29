@@ -144,6 +144,9 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
       // so a fire-and-forget rejection can never escape as an unhandled rejection.
       void doPoll().catch(() => {}); // fire immediately on start
       timer = setInterval(() => void doPoll().catch(() => {}), opts.intervalMs);
+      // The poller must not hold the host process open — interactive sessions keep
+      // the loop alive via the TUI (polling cadence unaffected); print mode exits.
+      timer.unref?.();
     },
     stop: () => {
       if (timer) {
