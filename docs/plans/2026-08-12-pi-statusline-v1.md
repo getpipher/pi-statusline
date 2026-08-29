@@ -654,7 +654,7 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
 ```bash
 node --import tsx --test test/quota-zai.test.ts
 ```
-Expected: PASS — 8 tests pass
+Expected: PASS — 9 tests pass
 
 - [ ] **Step 5: Commit**
 
