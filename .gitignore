@@ -26,3 +26,7 @@ Thumbs.db
 
 # logs
 *.log
+
+# superpowers brainstorm runtime state (mockup content/ stays tracked)
+.superpowers/brainstorm/*/state/
+.superpowers/brainstorm/.last-*
