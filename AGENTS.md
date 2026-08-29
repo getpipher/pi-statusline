@@ -8,8 +8,8 @@
 
 ## Status
 
-**Current:** v1 implementation complete on `feat/v1-footer` — footer (model/git/tokens/ctx%/statuses/quota), z.ai quota poller, `/statusline` notify-based commands. Design A1–A7 (A3″/A4′/A5-refined) locked; z.ai quota API confirmed.
-**Next:** final merge of `feat/v1-footer`, then deferred follow-ups (interactive TUI panel, Task 8 offline fast-path).
+**Current:** v1 **merged to `main`** (2026-08-29, merge commit `4827a41`) — footer (model/git/tokens/ctx%/statuses/quota), z.ai quota poller, `/statusline` notify-based commands. Design A1–A7 (A3″/A4′/A5-refined) locked; z.ai quota API confirmed. CI (test) + release (npm publish on `v*` tag) + GitLab mirror workflows live; not yet published to npm.
+**Next:** cut `v0.1.0` (tag push → release workflow), then deferred follow-ups (interactive TUI panel §9, provider badge + cached tokens M2, Task 8 offline fast-path, ledger minors #8/#1/#14).
 
 ## Read first
 
