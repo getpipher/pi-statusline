@@ -1,6 +1,7 @@
 // src/footer.ts
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { StatuslineConfig } from "./config.ts";
+import { renderModelSegment } from "./segments/model.ts";
 
 export interface FooterRenderInput {
   modelId: string | undefined;
@@ -18,10 +19,9 @@ export interface FooterRenderInput {
 export function composeSegments(input: FooterRenderInput): string[] {
   const parts: string[] = [];
 
-  // Model badge — always present (index 0)
-  const slash = input.modelId ? input.modelId.indexOf("/") : -1;
-  const modelShort = slash > 0 ? input.modelId!.slice(slash + 1) : (input.modelId ?? "no-model");
-  parts.push(modelShort);
+  // Model badge — always present (index 0). renderModelSegment is the canonical formatter
+  // (strips provider prefix + :variant suffix; "no-model" fallback for undefined).
+  parts.push(renderModelSegment(input.modelId));
 
   // Git branch
   if (input.config.display.showGit && input.gitBranch) {

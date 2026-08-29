@@ -93,3 +93,17 @@ test("truncateSegments always keeps model badge", () => {
   const joined = truncated.join(" ");
   assert.ok(joined.includes("claude-sonnet-4"), "model kept at tiny width");
 });
+
+test("composeSegments model badge strips variant suffix (uses renderModelSegment)", () => {
+  // Alignment: footer must use the canonical badge formatter — same rule as segments/model.ts.
+  // "Ollama/glm-5.2:cloud" → "glm-5.2" (NOT "glm-5.2:cloud").
+  const segs = composeSegments({
+    modelId: "Ollama/glm-5.2:cloud",
+    gitBranch: "main",
+    tokens: "↑1.5k ↓700",
+    ctxPct: "42%",
+    quota: null,
+    config: cfg,
+  });
+  assert.equal(segs[0], "glm-5.2", `first segment must strip the :variant suffix: ${JSON.stringify(segs)}`);
+});
