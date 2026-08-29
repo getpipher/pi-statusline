@@ -10,21 +10,21 @@ import { renderContextSegment } from "../src/segments/context.ts";
 import { renderQuotaSegment } from "../src/segments/quota.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
 
-test("detectProvider extracts provider from model id", () => {
+test("detectProvider extracts prefixes but bare pi model ids have no provider", () => {
   assert.equal(detectProvider("zai/glm-5.2"), "zai");
   assert.equal(detectProvider("Ollama/glm-5.2:cloud"), "Ollama");
   assert.equal(detectProvider("anthropic/claude-sonnet-4"), "anthropic");
-  assert.equal(detectProvider("some-model"), "unknown");
+  assert.equal(detectProvider("glm-5.2"), "unknown");
 });
 
-test("isZaiProvider: true for the zai provider (the active GLM Coding Plan session)", () => {
-  assert.equal(isZaiProvider("zai/glm-5.2"), true);
+test("isZaiProvider accepts pi's separate provider field", () => {
+  assert.equal(isZaiProvider("zai"), true);
 });
 
-test("isZaiProvider: false for the Ollama proxy and other providers", () => {
-  assert.equal(isZaiProvider("Ollama/glm-5.2:cloud"), false);
-  assert.equal(isZaiProvider("anthropic/claude-sonnet-4"), false);
-  assert.equal(isZaiProvider("openai-codex/gpt-5.6-sol"), false);
+test("isZaiProvider rejects non-zai and missing providers", () => {
+  assert.equal(isZaiProvider("Ollama"), false);
+  assert.equal(isZaiProvider("anthropic"), false);
+  assert.equal(isZaiProvider("openai-codex"), false);
   assert.equal(isZaiProvider(undefined), false);
 });
 

@@ -20,6 +20,10 @@ export default function (pi: ExtensionAPI): void {
   let poller: QuotaPoller | null = null;
   let requestRenderFn: (() => void) | null = null;
   let sessionCtx: ExtensionContext | null = null;
+  let activeModel: { provider: string | undefined; id: string | undefined } = {
+    provider: undefined,
+    id: undefined,
+  };
   let footerInstalled = false;
 
   function startPoller(): void {
@@ -42,6 +46,7 @@ export default function (pi: ExtensionAPI): void {
 
   function installFooter(ctx: ExtensionContext): void {
     if (footerInstalled) return;
+    activeModel = { provider: ctx.model?.provider, id: ctx.model?.id };
     ctx.ui.setFooter((tui, theme, footerData) => {
       requestRenderFn = () => tui.requestRender();
 
@@ -60,7 +65,11 @@ export default function (pi: ExtensionAPI): void {
           tui.requestRender();
         },
         render(width: number): string[] {
-          const modelId = ctx.model?.id;
+          // ExtensionContext exposes the active model as live state. Keep event state as
+          // a fallback for hosts that update model_select before refreshing the context.
+          const modelProvider = ctx.model?.provider ?? activeModel.provider;
+          const modelId = ctx.model?.id ?? activeModel.id;
+          activeModel = { provider: modelProvider, id: modelId };
           const branch = footerData.getGitBranch();
 
           let tokensStr = "";
@@ -77,7 +86,7 @@ export default function (pi: ExtensionAPI): void {
 
           // A5 quota dimming: bright when the session draws on the z.ai plan,
           // dimmed when the active provider is something else (subscription status).
-          const quotaDimmed = !isZaiProvider(modelId);
+          const quotaDimmed = !isZaiProvider(modelProvider);
           const quotaStr = renderQuotaSegment(poller?.get() ?? null, quotaDimmed);
 
           // Build the canonical segment ARRAY, truncate it, THEN join —
@@ -128,8 +137,9 @@ export default function (pi: ExtensionAPI): void {
     }
   });
 
-  // Re-render on model change (provider switch affects quota dimming)
-  pi.on("model_select", () => {
+  // Update model state and re-render on provider/model switches.
+  pi.on("model_select", (event) => {
+    activeModel = { provider: event.model.provider, id: event.model.id };
     requestRenderFn?.();
   });
 
