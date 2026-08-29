@@ -35,7 +35,9 @@ export function activateStatusline(
   dependencyOverrides: Partial<StatuslineRuntimeDependencies> = {},
 ): void {
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...dependencyOverrides };
-  let config = loadConfig(dependencies.configPath);
+  const loaded = loadConfig(dependencies.configPath);
+  let config = loaded.config;
+  const pendingRowWarnings = new Set(loaded.unknownRows);
   let poller: QuotaPoller | null = null;
   let requestRenderFn: (() => void) | null = null;
   let sessionCtx: ExtensionContext | null = null;
@@ -146,7 +148,9 @@ export function activateStatusline(
   }
 
   function reloadConfig(): void {
-    config = loadConfig(dependencies.configPath);
+    const reloaded = loadConfig(dependencies.configPath);
+    config = reloaded.config;
+    for (const id of reloaded.unknownRows) pendingRowWarnings.add(id);
     if (config.enabled) {
       startPoller();
       if (sessionCtx) installFooter(sessionCtx);

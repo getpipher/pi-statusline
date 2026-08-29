@@ -4,11 +4,12 @@ import assert from "node:assert/strict";
 
 import { composeSegments, truncateSegments } from "../src/footer.ts";
 import type { StatuslineConfig } from "../src/config.ts";
+import { KNOWN_ROW_IDS } from "../src/types.ts";
 
 const cfg: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
-  display: { showTokens: true, showContext: true, showGit: true, showSession: true },
+  display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true },
 };
 
 function input(overrides: Partial<Parameters<typeof composeSegments>[0]> = {}): Parameters<typeof composeSegments>[0] {
