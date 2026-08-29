@@ -15,8 +15,26 @@ import { parseStatuslineArgs } from "./tui/settings.ts";
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-statusline.json");
 
-export default function (pi: ExtensionAPI): void {
-  let config = loadConfig(CONFIG_PATH);
+export interface StatuslineRuntimeDependencies {
+  authJsonPath: string;
+  configPath: string;
+  readKey: typeof readZaiKey;
+  makePoller: typeof createQuotaPoller;
+}
+
+const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
+  authJsonPath: AUTH_JSON,
+  configPath: CONFIG_PATH,
+  readKey: readZaiKey,
+  makePoller: createQuotaPoller,
+};
+
+export function activateStatusline(
+  pi: ExtensionAPI,
+  dependencyOverrides: Partial<StatuslineRuntimeDependencies> = {},
+): void {
+  const dependencies = { ...DEFAULT_DEPENDENCIES, ...dependencyOverrides };
+  let config = loadConfig(dependencies.configPath);
   let poller: QuotaPoller | null = null;
   let requestRenderFn: (() => void) | null = null;
   let sessionCtx: ExtensionContext | null = null;
@@ -28,10 +46,10 @@ export default function (pi: ExtensionAPI): void {
 
   function startPoller(): void {
     stopPoller();
-    const apiKey = readZaiKey(AUTH_JSON);
+    const apiKey = dependencies.readKey(dependencies.authJsonPath);
     if (!apiKey) return;
 
-    poller = createQuotaPoller({
+    poller = dependencies.makePoller({
       apiKey,
       intervalMs: config.zai.pollIntervalMs,
       onRefresh: () => requestRenderFn?.(),
@@ -79,8 +97,9 @@ export default function (pi: ExtensionAPI): void {
 
           let tokensStr = "";
           if (config.display.showTokens) {
-            const entries = ctx.sessionManager.getBranch() as unknown as Array<Record<string, unknown>>;
-            tokensStr = renderTokensSegment(entries as never);
+            // getEntries() is Pi's complete session-entry accessor and is also what
+            // the native footer uses for cumulative assistant usage totals.
+            tokensStr = renderTokensSegment(ctx.sessionManager.getEntries());
           }
 
           let ctxPct = "";
@@ -123,7 +142,7 @@ export default function (pi: ExtensionAPI): void {
   }
 
   function reloadConfig(): void {
-    config = loadConfig(CONFIG_PATH);
+    config = loadConfig(dependencies.configPath);
     if (config.enabled) {
       startPoller();
       if (sessionCtx) installFooter(sessionCtx);
@@ -169,7 +188,7 @@ export default function (pi: ExtensionAPI): void {
           break;
         case "set-enabled": {
           config = { ...config, enabled: action.enabled };
-          saveConfig(CONFIG_PATH, config);
+          saveConfig(dependencies.configPath, config);
           if (action.enabled) {
             reloadConfig(); // starts poller + installs footer mid-session (no restart needed)
             ctx.ui.notify("Statusline enabled", "info");
@@ -185,7 +204,7 @@ export default function (pi: ExtensionAPI): void {
         }
         case "set-tier": {
           config = { ...config, zai: { ...config.zai, tier: action.tier } };
-          saveConfig(CONFIG_PATH, config);
+          saveConfig(dependencies.configPath, config);
           ctx.ui.notify(`Tier override set to ${action.tier} (auto = use data.level from the API)`, "info");
           break;
         }
@@ -195,4 +214,8 @@ export default function (pi: ExtensionAPI): void {
       }
     },
   });
+}
+
+export default function (pi: ExtensionAPI): void {
+  activateStatusline(pi);
 }
