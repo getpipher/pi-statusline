@@ -8,8 +8,8 @@
 
 ## Status
 
-**Current:** Design phase — **v2 spec finalized** (A3″/A4′/A5-refined locked; z.ai quota API confirmed). Repo: docs only; no code yet.
-**Next:** implementation plan (writing-plans) → build.
+**Current:** v1 implementation complete on `feat/v1-footer` — footer (model/git/tokens/ctx%/statuses/quota), z.ai quota poller, `/statusline` notify-based commands. Design A1–A7 (A3″/A4′/A5-refined) locked; z.ai quota API confirmed.
+**Next:** final merge of `feat/v1-footer`, then deferred follow-ups (interactive TUI panel, Task 8 offline fast-path).
 
 ## Read first
 
@@ -31,7 +31,7 @@
 ## pi extension mechanics (verified)
 
 - Footer replace: `ctx.ui.setFooter((tui, theme, footerData) => ({ render(width): string[], dispose, invalidate }))`
-- Data: `ctx.model`, `ctx.sessionManager.getBranch()` (per-message `usage` — real `zai`/`glm-5.2` shape: `{input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost:{…,total:0}}`), `ctx.getContextUsage()`, `footerData.getGitBranch()` / `onBranchChange()`, `after_provider_response` (`event.status`, `event.headers`).
+- Data: `ctx.model`, `ctx.sessionManager.getEntries()` (per-message `usage` — real `zai`/`glm-5.2` shape: `{input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost:{…,total:0}}`), `ctx.getContextUsage()`, `footerData.getGitBranch()` / `onBranchChange()`, `after_provider_response` (`event.status`, `event.headers`).
 - **z.ai quota API** (verified 2026-08-12): `GET https://api.z.ai/api/monitor/usage/quota/limit` + `Authorization: Bearer <zai key>` → `data.{limits:[{usage,currentValue,remaining,percentage,nextResetTime(ms-epoch UTC)}], level}`. Same perimeter as inference; zero credit cost to poll.
 - **Key access** (build-time verify): prefer a pi extension credential accessor; fallback = read `~/.pi/agent/auth.json` → `zai.key` in-process (never log it).
 - Theme: `theme.fg(color, text)` / `theme.bg(color, text)` — colors: `text accent muted dim success warning error toolTitle`.

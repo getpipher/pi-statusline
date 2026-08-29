@@ -14,11 +14,12 @@
 - TDD mandatory; `pnpm test:run` (node:test via tsx) after changes; `pnpm typecheck` clean. No build step (raw .ts via tsx at pi runtime).
 - Secrets: read `zai.key` from `~/.pi/agent/auth.json` in-process; never log/echo/commit it. `.env`/auth.json never committed.
 - z.ai quota API: `GET https://api.z.ai/api/monitor/usage/quota/limit` with `Authorization: Bearer <zai inference key>` → 200 `{ data: { limits: [...], level: "lite"|"pro"|"max" } }`. `nextResetTime` = ms-epoch UTC. Same Bearer perimeter as inference. Zero credit cost to poll.
-- Key access: `~/.pi/agent/auth.json` → `zai.key.key` (object: `{"zai":{"type":"api_key","key":"<value>"}}`). Read in-process, never log.
+- Key access: `~/.pi/agent/auth.json` → top-level `"zai"` object → its `key` field (`{"zai":{"type":"api_key","key":"<value>"}}`; the extension reads `zai.key`, one level — not `zai.key.key`). Read in-process, never log.
+- Tier override (`zai.tier`) is RESERVED for the deferred offline fast-path (Task 8) — v1 auto-detects the tier from `data.level`; `/statusline tier` only persists the override.
 - Per-message usage shape: `{ input, output, cacheRead, cacheWrite, reasoning, totalTokens, cost: { ..., total: 0 } }`. Cached-token field is `cacheRead` (camelCase).
 - pi footer API: `ctx.ui.setFooter((tui, theme, footerData) => ({ render(width): string[], dispose?, invalidate? }))`. `footerData.getGitBranch()`, `footerData.getExtensionStatuses(): ReadonlyMap<string,string>`, `footerData.onBranchChange(cb): unsubscribe`. `theme.fg(color, text)`/`theme.bg(color, text)`; colors: text accent muted dim success warning error toolTitle. `tui.requestRender()` to invalidate.
 - `truncateToWidth` / `visibleWidth` from `@earendil-works/pi-tui`.
-- A5-refined: ALWAYS render our footer. z.ai quota segment is subscription-scoped (shown when zai key exists, dimmed when active provider ≠ zai). Session segment is active-provider-scoped. Never yield to native. Truncation order (drop right→left): quota → ctx% → tokens → git; always keep model badge.
+- A5-refined: ALWAYS render our footer. z.ai quota segment is subscription-scoped (shown when zai key exists, dimmed when active provider ≠ zai). Session segment is active-provider-scoped. Never yield to native. Truncation order (drop right→left): quota → statuses → ctx% → tokens → git; always keep model badge. (statuses stage added in final fix wave — H1)
 
 ---
 
@@ -120,6 +121,7 @@ pi-statusline/
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
@@ -653,7 +655,7 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
 ```bash
 node --import tsx --test test/quota-zai.test.ts
 ```
-Expected: PASS — 8 tests pass
+Expected: PASS — 9 tests pass
 
 - [ ] **Step 5: Commit**
 
@@ -955,7 +957,7 @@ git commit -m "feat(segments): provider detect + model/git/tokens/context/quota 
 **Interfaces:**
 - Produces: `createFooterFactory(opts)` → the `(tui, theme, footerData) => { render, dispose, invalidate }` factory passed to `ctx.ui.setFooter()`.
 - Consumes: `composeSegments` + `truncateSegments` from this file's own module; segment renderers from Task 4; `QuotaPoller` from Task 3.
-- Note: `composeFooterLine` from the original draft is **replaced** by `composeSegments` (returns the ordered array; the caller joins AFTER truncation — never re-split a joined string, since the quota segment contains spaces).
+- Note: `createFooterFactory` from the original draft is **replaced** by Task 7's `installFooter(ctx)` wiring; `composeFooterLine` is **replaced** by `composeSegments` (returns the ordered array; the caller joins AFTER truncation — never re-split a joined string, since the quota segment contains spaces).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1149,7 +1151,7 @@ git commit -m "feat(footer): compose + truncate segments with responsive width"
 - Create: `test/tui-settings.test.ts`
 
 **Interfaces:**
-- Produces: `parseStatuslineArgs(args)` → `StatuslineAction`, `createSettingsPanel(opts)` → component for `ctx.ui.custom()`.
+- Produces: `parseStatuslineArgs(args)` → `StatuslineAction`. (The interactive `ctx.ui.custom()` settings panel is DEFERRED out of v1 — Task 7 wires a notify-based direct-arg UX; see design §9 follow-up.)
 
 - [ ] **Step 1: Write the failing test (arg parser only; TUI is smoke-tested in Task 7)**
 
