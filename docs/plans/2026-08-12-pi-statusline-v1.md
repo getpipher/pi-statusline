@@ -956,7 +956,7 @@ git commit -m "feat(segments): provider detect + model/git/tokens/context/quota 
 **Interfaces:**
 - Produces: `createFooterFactory(opts)` → the `(tui, theme, footerData) => { render, dispose, invalidate }` factory passed to `ctx.ui.setFooter()`.
 - Consumes: `composeSegments` + `truncateSegments` from this file's own module; segment renderers from Task 4; `QuotaPoller` from Task 3.
-- Note: `composeFooterLine` from the original draft is **replaced** by `composeSegments` (returns the ordered array; the caller joins AFTER truncation — never re-split a joined string, since the quota segment contains spaces).
+- Note: `createFooterFactory` from the original draft is **replaced** by Task 7's `installFooter(ctx)` wiring; `composeFooterLine` is **replaced** by `composeSegments` (returns the ordered array; the caller joins AFTER truncation — never re-split a joined string, since the quota segment contains spaces).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1150,7 +1150,7 @@ git commit -m "feat(footer): compose + truncate segments with responsive width"
 - Create: `test/tui-settings.test.ts`
 
 **Interfaces:**
-- Produces: `parseStatuslineArgs(args)` → `StatuslineAction`, `createSettingsPanel(opts)` → component for `ctx.ui.custom()`.
+- Produces: `parseStatuslineArgs(args)` → `StatuslineAction`. (The interactive `ctx.ui.custom()` settings panel is DEFERRED out of v1 — Task 7 wires a notify-based direct-arg UX; see design §9 follow-up.)
 
 - [ ] **Step 1: Write the failing test (arg parser only; TUI is smoke-tested in Task 7)**
 
