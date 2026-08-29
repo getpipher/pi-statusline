@@ -8,13 +8,14 @@ export interface FooterRenderInput {
   gitBranch: string | null;
   tokens: string;
   ctxPct: string;
+  statuses: string;
   quota: string | null;
   config: StatuslineConfig;
 }
 
-// Canonical segment order: [model, git, tokens, ctx, quota].
-// truncateSegments drops from the RIGHT (quota → ctx → tokens → git), so this
-// order IS the drop order — missing segments (empty git, disabled tokens) are
+// Canonical segment order: [model, git, tokens, ctx, statuses, quota].
+// truncateSegments drops from the RIGHT (quota → statuses → ctx → tokens → git),
+// so this order IS the drop order — missing or disabled segments are
 // simply absent and never break the indices.
 export function composeSegments(input: FooterRenderInput): string[] {
   const parts: string[] = [];
@@ -36,6 +37,12 @@ export function composeSegments(input: FooterRenderInput): string[] {
   // Context %
   if (input.config.display.showContext && input.ctxPct) {
     parts.push(input.ctxPct);
+  }
+
+  // Other extensions' status text — surfaced so replacing the native footer does
+  // not discard neighboring extensions' setStatus output.
+  if (input.statuses) {
+    parts.push(input.statuses);
   }
 
   // Quota (subscription-scoped — shown whenever we have data) — LAST = first dropped

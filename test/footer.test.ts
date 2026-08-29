@@ -11,99 +11,71 @@ const cfg: StatuslineConfig = {
   display: { showTokens: true, showContext: true, showGit: true },
 };
 
-test("composeSegments produces model + tokens + ctx + git in canonical order", () => {
-  const segs = composeSegments({
-    modelId: "zai/glm-5.2",
+function input(overrides: Partial<Parameters<typeof composeSegments>[0]> = {}): Parameters<typeof composeSegments>[0] {
+  return {
+    modelId: "glm-5.2",
     gitBranch: "main",
     tokens: "↑1.5k ↓700",
     ctxPct: "42%",
+    statuses: "fleet ready",
     quota: null,
     config: cfg,
-  });
-  // Canonical order: [model, git, tokens, ctx, quota] — truncation relies on it
-  assert.deepEqual(segs, ["glm-5.2", "main", "↑1.5k ↓700", "42%"]);
+    ...overrides,
+  };
+}
+
+test("composeSegments produces the canonical segment order", () => {
+  assert.deepEqual(
+    composeSegments(input()),
+    ["glm-5.2", "main", "↑1.5k ↓700", "42%", "fleet ready"],
+  );
 });
 
-test("composeSegments includes quota as the LAST segment when present", () => {
-  const segs = composeSegments({
-    modelId: "zai/glm-5.2",
-    gitBranch: "main",
-    tokens: "↑1.5k ↓700",
-    ctxPct: "42%",
-    quota: "⚡zai 5h 1.5k/2.0k 75% · wk 1.5k/10k 15% · reset 2h55m",
-    config: cfg,
-  });
-  assert.equal(segs[segs.length - 1], "⚡zai 5h 1.5k/2.0k 75% · wk 1.5k/10k 15% · reset 2h55m");
-  assert.ok(segs[0] === "glm-5.2");
+test("composeSegments includes quota as the last segment", () => {
+  const quota = "⚡zai 5h 1.5k/2.0k 75% · wk 1.5k/10k 15% · reset 2h55m";
+  const segs = composeSegments(input({ quota }));
+  assert.equal(segs.at(-1), quota);
+  assert.equal(segs[0], "glm-5.2");
+});
+
+test("composeSegments surfaces neighboring extension statuses", () => {
+  const segs = composeSegments(input({ statuses: "fleet ready · memory warm" }));
+  assert.ok(segs.includes("fleet ready · memory warm"));
+  assert.equal(segs.indexOf("fleet ready · memory warm"), 4);
 });
 
 test("composeSegments omits git when display.showGit=false", () => {
-  const cfgNoGit = { ...cfg, display: { ...cfg.display, showGit: false } };
-  const segs = composeSegments({
-    modelId: "zai/glm-5.2",
-    gitBranch: "main",
-    tokens: "↑1.5k ↓700",
-    ctxPct: "42%",
-    quota: null,
-    config: cfgNoGit,
-  });
-  assert.ok(!segs.includes("main"), `no git: ${JSON.stringify(segs)}`);
+  const config = { ...cfg, display: { ...cfg.display, showGit: false } };
+  assert.ok(!composeSegments(input({ config })).includes("main"));
 });
 
 test("composeSegments omits tokens when display.showTokens=false", () => {
-  const cfgNoTok = { ...cfg, display: { ...cfg.display, showTokens: false } };
-  const segs = composeSegments({
-    modelId: "zai/glm-5.2",
-    gitBranch: "main",
-    tokens: "↑1.5k ↓700",
-    ctxPct: "42%",
-    quota: null,
-    config: cfgNoTok,
-  });
-  assert.ok(!segs.some((s) => s.includes("↑")), `no tokens: ${JSON.stringify(segs)}`);
+  const config = { ...cfg, display: { ...cfg.display, showTokens: false } };
+  assert.ok(!composeSegments(input({ config })).some((segment) => segment.includes("↑")));
 });
 
-test("truncateSegments drops rightmost first (quota → ctx → tokens → git)", () => {
-  const segs = [
-    "glm-5.2",       // model — always kept (index 0)
-    "main",          // git — dropped 4th
-    "↑1.5k ↓700",   // tokens — dropped 3rd
-    "42%",           // ctx — dropped 2nd
-    "⚡zai 5h 1.5k/2.0k 75%",  // quota — dropped 1st
-  ];
-  // At width ~20, should drop quota
-  const truncated = truncateSegments(segs, 20);
-  const joined = truncated.join(" ");
-  assert.ok(joined.includes("glm-5.2"), "model kept");
-  assert.ok(!joined.includes("⚡"), "quota dropped");
+test("composeSegments omits context when display.showContext=false", () => {
+  const config = { ...cfg, display: { ...cfg.display, showContext: false } };
+  assert.ok(!composeSegments(input({ config })).includes("42%"));
 });
 
-test("truncateSegments is robust to missing segments (no git)", () => {
-  // Canonical order minus git — pop-from-end still drops quota first, not ctx
-  const segs = ["glm-5.2", "↑1.5k ↓700", "42%", "⚡zai 5h 1.5k/2.0k 75%"];
-  const truncated = truncateSegments(segs, 20);
-  const joined = truncated.join(" ");
-  assert.ok(joined.includes("glm-5.2"), "model kept");
-  assert.ok(!joined.includes("⚡"), "quota dropped first even without git");
+test("truncateSegments drops quota, then statuses, before context", () => {
+  const segs = ["model", "git", "tokens", "ctx", "statuses", "quota"];
+  assert.deepEqual(truncateSegments(segs, 29), ["model", "git", "tokens", "ctx", "statuses"]);
+  assert.deepEqual(truncateSegments(segs, 20), ["model", "git", "tokens", "ctx"]);
 });
 
-test("truncateSegments always keeps model badge", () => {
-  const segs = ["claude-sonnet-4", "main", "↑1.5k ↓700", "42%", "⚡zai 5h 75%"];
-  const truncated = truncateSegments(segs, 5);
-  const joined = truncated.join(" ");
-  assert.ok(joined.includes("claude-sonnet-4"), "model kept at tiny width");
+test("truncateSegments is robust to missing git", () => {
+  const segs = ["glm-5.2", "↑1.5k ↓700", "42%", "fleet ready", "⚡zai 5h 75%"];
+  const joined = truncateSegments(segs, 28).join(" ");
+  assert.ok(joined.includes("glm-5.2"));
+  assert.ok(!joined.includes("⚡"));
 });
 
-test("composeSegments model badge strips variant suffix (uses renderModelSegment)", () => {
-  // Alignment: footer must use the canonical badge formatter — same rule as segments/model.ts.
-  // "Ollama/glm-5.2:cloud" → "glm-5.2" (NOT "glm-5.2:cloud").
-  const segs = composeSegments({
-    modelId: "Ollama/glm-5.2:cloud",
-    gitBranch: "main",
-    tokens: "↑1.5k ↓700",
-    ctxPct: "42%",
-    quota: null,
-    config: cfg,
-  });
-  assert.equal(segs[0], "glm-5.2", `first segment must strip the :variant suffix: ${JSON.stringify(segs)}`);
+test("truncateSegments filters empty strings and always keeps the model badge", () => {
+  assert.deepEqual(truncateSegments(["claude-sonnet-4", "", "main"], 5), ["claude-sonnet-4"]);
+});
+
+test("composeSegments uses the canonical model formatter", () => {
+  assert.equal(composeSegments(input({ modelId: "Ollama/glm-5.2:cloud" }))[0], "glm-5.2");
 });

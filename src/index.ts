@@ -71,6 +71,11 @@ export default function (pi: ExtensionAPI): void {
           const modelId = ctx.model?.id ?? activeModel.id;
           activeModel = { provider: modelProvider, id: modelId };
           const branch = footerData.getGitBranch();
+          // FooterData has no status-change subscription. Statuses refresh on normal TUI
+          // renders, branch/model changes, and quota refreshes without adding a timer.
+          const statuses = [...footerData.getExtensionStatuses().values()]
+            .filter(Boolean)
+            .join(" · ");
 
           let tokensStr = "";
           if (config.display.showTokens) {
@@ -95,6 +100,7 @@ export default function (pi: ExtensionAPI): void {
             gitBranch: branch,
             tokens: tokensStr,
             ctxPct,
+            statuses,
             quota: quotaStr || null,
             config,
           });
