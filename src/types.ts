@@ -1,5 +1,13 @@
 // src/types.ts
-export type ColorToken = "text" | "muted" | "dim" | "accent" | "warning" | "error";
+export type ColorToken =
+  | "text"
+  | "muted"
+  | "dim"
+  | "accent"
+  | "warning"
+  | "error"
+  | "success"
+  | "toolTitle";
 
 export interface Fragment {
   text: string;

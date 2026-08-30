@@ -11,16 +11,17 @@ across all providers accumulates in a local ledger.
 ## Render preview
 
 ```
-v2-p1 pi-statusline ⎇ main · glm-5.2
-ctx ▕███░░░░░░░▏ 34% 68k/200k · ↑48k ↓6.2k · cache 68%
-$ 1.24 sess · 8.40 day · 31.20 7d · 118.75 30d ▁▂▃▅▃▂▇ · $0.39/hr
-zai ▕████████░░▏ 75% 1.5k/2.0k 5h · wk 15% · reset 2h55m
-04:12 · coding 3h12m
+v2-p1 pi-statusline ⎇ main | glm-5.2
+ctx ▕███░░░░░░░▏ 34% 68k/200k | ↑48k ↓6.2k | cache 68%
+$ 1.24 sess | 8.40 day | 31.20 7d | 118.75 30d ▁▁▂▄▂▁▇ | $0.39/hr
+zai ▕████████░░▏ 75% 1.5k/2.0k 5h | wk 15% | reset 2h55m
+04:12 | coding 3h12m
 ```
 
-Color semantics: values render bright (`text`); bar fills use `accent` and escalate to
-`warning`/`error` at ≥70%/≥90% (empty cells stay dim); the quota row tints by usage heat
-(same bands); labels/separators are dim, secondary metadata muted, ambient row fully dim.
+Color semantics (theme-integrated hues): money values + sparkline `success` (green), git branch
+and token flow `toolTitle` (blue), model + bar fills `accent` (escalating to `warning`/`error`
+at ≥70%/≥90%), quota row tints by usage heat (same bands); values `text`; labels/separators dim;
+ambient row fully dim. Separator is ` | `.
 
 ## Install
 

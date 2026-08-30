@@ -37,12 +37,12 @@ export function createContextRow(): Row {
         }
       }
       if (display.showTokens) {
-        frags.push({ text: ` · ↑${formatTokenCount(s.usage.input)} ↓${formatTokenCount(s.usage.output)}`, color: "text" });
+        frags.push({ text: ` | ↑${formatTokenCount(s.usage.input)} ↓${formatTokenCount(s.usage.output)}`, color: "toolTitle" });
       }
       const cacheDenominator = s.usage.cacheRead + s.usage.input;
       if (cacheDenominator > 0) {
         const hit = Math.round((s.usage.cacheRead / cacheDenominator) * 100);
-        frags.push({ text: ` · cache ${hit}%`, color: "muted" });
+        frags.push({ text: ` | cache ${hit}%`, color: "muted" });
       }
       return frags.length > 1 ? frags : null;
     },

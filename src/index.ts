@@ -143,7 +143,7 @@ export function activateStatusline(
             width,
             session: sessionStore.getSnapshot(),
             ledger: ledger.getSnapshot(),
-            statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" · "),
+            statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
