@@ -13,7 +13,7 @@ export function createMoneyRow(): Row {
       const frags: Fragment[] = [{ text: "$", color: "dim" }];
 
       // Session cost is pi-native real data (D4) — works for every provider.
-      frags.push({ text: ` ${formatMoney(usage.cost)} sess`, color: "muted" });
+      frags.push({ text: ` ${formatMoney(usage.cost)} sess`, color: "text" });
       frags.push({ text: ` · ${formatMoney(ledger.todayCost)} day`, color: "muted" });
       frags.push({ text: ` · ${formatMoney(ledger.last7Cost)} 7d`, color: "muted" });
       frags.push({ text: ` · ${formatMoney(ledger.last30Cost)} 30d`, color: "muted" });

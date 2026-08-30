@@ -18,6 +18,10 @@ zai ▕████████░░▏ 75% 1.5k/2.0k 5h · wk 15% · reset 2h5
 04:12 · coding 3h12m
 ```
 
+Color semantics: values render bright (`text`); bar fills use `accent` and escalate to
+`warning`/`error` at ≥70%/≥90% (empty cells stay dim); the quota row tints by usage heat
+(same bands); labels/separators are dim, secondary metadata muted, ambient row fully dim.
+
 ## Install
 
 In `~/.pi/agent/settings.json`:

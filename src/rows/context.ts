@@ -1,5 +1,5 @@
 // src/rows/context.ts
-import { formatTokenCount, renderBar } from "../format.ts";
+import { formatTokenCount, splitBar } from "../format.ts";
 import type { ColorToken, Fragment } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
@@ -22,19 +22,22 @@ export function createContextRow(): Row {
 
       const showPct = display.showContext && ratio !== null;
       if (display.bars && ratio !== null && (showPct || s.contextTokens !== null)) {
-        // Theme-safe escalation: warning ≥70%, error ≥90%.
+        // Two-tone bar: filled cells carry the escalation color (accent, warning ≥70%,
+        // error ≥90%); empty cells stay dim so usage reads as a filled gauge.
         const pct = ratio * 100;
-        const barColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "muted";
-        frags.push({ text: ` ${renderBar(ratio)}`, color: barColor });
+        const fillColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "accent";
+        const { filled, empty } = splitBar(ratio);
+        frags.push({ text: filled, color: fillColor });
+        frags.push({ text: empty, color: "dim" });
       }
       if (showPct) {
-        frags.push({ text: ` ${Math.round(ratio * 100)}%`, color: "muted" });
+        frags.push({ text: ` ${Math.round(ratio * 100)}%`, color: "text" });
         if (s.contextTokens !== null && s.contextWindow > 0) {
-          frags.push({ text: ` ${formatTokenCount(s.contextTokens)}/${formatTokenCount(s.contextWindow)}`, color: "muted" });
+          frags.push({ text: ` ${formatTokenCount(s.contextTokens)}/${formatTokenCount(s.contextWindow)}`, color: "text" });
         }
       }
       if (display.showTokens) {
-        frags.push({ text: ` · ↑${formatTokenCount(s.usage.input)} ↓${formatTokenCount(s.usage.output)}`, color: "muted" });
+        frags.push({ text: ` · ↑${formatTokenCount(s.usage.input)} ↓${formatTokenCount(s.usage.output)}`, color: "text" });
       }
       const cacheDenominator = s.usage.cacheRead + s.usage.input;
       if (cacheDenominator > 0) {
