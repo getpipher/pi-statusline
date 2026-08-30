@@ -106,3 +106,48 @@ test("city auto resolves via IP-geo (cached 7d); geo failure → row omitted", a
   assert.equal(src2.current(), null); // no city resolvable → no fetch → row omitted
   cleanup2();
 });
+
+test("stale-FILE recovery: fresh source serves the stale cache after a failed fetch", async () => {
+  const t0 = Date.UTC(2026, 7, 30, 10, 0);
+  const later = t0 + 25 * 3_600_000; // past the 24h data TTL → cache is stale, fetch fails
+  const dir = mkdtempSync(join(tmpdir(), "deen-src-"));
+  const cachePath = join(dir, "deen-cache.json");
+  try {
+    const seed = createDeenSource({ cachePath, config: () => CFG, now: () => t0, fetchPrayer: async () => DATA });
+    await seed.refresh(); // seeds the cache file (fetchedAt = t0, data.timezone "UTC")
+
+    // Fresh instance (empty in-memory last-good) on the SAME cachePath.
+    const src2 = createDeenSource({ cachePath, config: () => CFG, now: () => later, fetchPrayer: async () => null });
+    await src2.refresh();
+    const stale = src2.current()!;
+    assert.ok(stale, "stale file served after failed fetch with empty memory");
+    assert.ok(stale.staleMinutes !== null && stale.staleMinutes > 0, "staleMinutes set (> 0 at +25h)");
+    assert.equal(stale.schedule[0]!.name, "Fajr"); // last-good timetable
+    assert.equal(stale.hijri, "17 Rabīʿ al-awwal 1448");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stale-FILE tz-mismatch: geo timezone ≠ cached data timezone → null (gate false side)", async () => {
+  const t0 = Date.UTC(2026, 7, 30, 10, 0);
+  const later = t0 + 25 * 3_600_000;
+  const dir = mkdtempSync(join(tmpdir(), "deen-src-"));
+  const cachePath = join(dir, "deen-cache.json");
+  try {
+    const seed = createDeenSource({ cachePath, config: () => CFG, now: () => t0, fetchPrayer: async () => DATA });
+    await seed.refresh(); // cached data.timezone = "UTC"
+
+    const src2 = createDeenSource({
+      cachePath,
+      config: () => ({ ...CFG, city: "auto" }),
+      now: () => later,
+      fetchGeo: async () => ({ city: "Seoul", country: "South Korea", timezone: "Asia/Seoul", fetchedAt: later }),
+      fetchPrayer: async () => null,
+    });
+    await src2.refresh();
+    assert.equal(src2.current(), null); // tz-match gate rejects the stale file
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

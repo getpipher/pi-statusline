@@ -128,7 +128,13 @@ export function createDeenSource(opts: DeenSourceOpts): DeenSource {
       const data = await fetchPrayer({ city, country, method: cfg.method, fetchImpl: opts.fetchFn });
       if (data) {
         const file: DeenCacheFile = { key, fetchedAt: nowMs, data, ...(geo ? { geo } : cached?.geo ? { geo: cached.geo } : {}) };
-        saveDeenCache(opts.cachePath, file);
+        // Non-fatal write: a locked-down cache dir (EACCES) or full disk degrades to
+        // serving the fresh snapshot from memory — refresh() must never reject here.
+        try {
+          saveDeenCache(opts.cachePath, file);
+        } catch {
+          /* non-fatal; snapshot still serves from memory */
+        }
         lastKey = key;
         lastFetchedAt = nowMs;
         snapshot = toSnapshot(data, city, null, cfg);
