@@ -45,34 +45,34 @@ test("identity row: session name bright lead, repo dim, branch mid with ⎇, mod
   assert.deepEqual(frags, [
     { text: "v2-p1", color: "text" },
     { text: " pi-statusline", color: "dim" },
-    { text: " ⎇ main", color: "muted" },
-    { text: " · glm-5.2", color: "accent" },
+    { text: " ⎇ main", color: "toolTitle" },
+    { text: " | glm-5.2", color: "accent" },
   ]);
 });
 
 test("identity row: strips provider prefix and variant from model id", () => {
   const row = createIdentityRow();
   const out = plain(row.render(snap({ session: session({ modelId: "ollama/glm-5.2:cloud" }) })));
-  assert.ok(out.includes(" · glm-5.2"));
+  assert.ok(out.includes(" | glm-5.2"));
 });
 
 test("identity row: omits name when unset or showSession=false; omits branch when null", () => {
   const row = createIdentityRow();
-  assert.equal(plain(row.render(snap({ session: session({ sessionName: undefined }) }))), "pi-statusline ⎇ main · glm-5.2");
+  assert.equal(plain(row.render(snap({ session: session({ sessionName: undefined }) }))), "pi-statusline ⎇ main | glm-5.2");
   const noSession = snap({ session: session({}), config: { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, showSession: false } } });
-  assert.equal(plain(row.render(noSession)), "pi-statusline ⎇ main · glm-5.2");
-  assert.equal(plain(row.render(snap({ session: session({ branch: null }) }))), "v2-p1 pi-statusline · glm-5.2");
+  assert.equal(plain(row.render(noSession)), "pi-statusline ⎇ main | glm-5.2");
+  assert.equal(plain(row.render(snap({ session: session({ branch: null }) }))), "v2-p1 pi-statusline | glm-5.2");
 });
 
 test("ambient row: clock, coding span, extension statuses — all dim", () => {
   const row = createAmbientRow();
-  const frags = row.render(snap({ statuses: "fleet ready · memory warm", session: session({}) }))!;
+  const frags = row.render(snap({ statuses: "fleet ready | memory warm", session: session({}) }))!;;
   const d = new Date(Date.UTC(2026, 7, 30, 4, 12)); // same instant — local-getter (TZ-deterministic)
   const clock = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   assert.deepEqual(frags, [
     { text: clock, color: "dim" },
-    { text: " · coding 3h12m", color: "dim" },
-    { text: " · fleet ready · memory warm", color: "dim" },
+    { text: " | coding 3h12m", color: "dim" },
+    { text: " | fleet ready | memory warm", color: "dim" },
   ]);
 });
 
@@ -82,7 +82,7 @@ test("ambient row: clock is rendered from snapshot.now in local time", () => {
   const expected = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   const out = plain(row.render(snap({ statuses: "", session: session({}) })));
   assert.ok(out.startsWith(expected), `expected clock ${expected}, got: ${out}`);
-  assert.ok(out.includes(" · coding 3h12m"));
+  assert.ok(out.includes(" | coding 3h12m"));
   assert.ok(!out.endsWith(" ·")); // no dangling separator when statuses empty
 });
 
@@ -105,8 +105,8 @@ test("ctx row: bar + percent + window + tokens + cache hit", () => {
     { text: "░░░░░░░▏", color: "dim" },
     { text: " 34%", color: "text" },
     { text: " 68k/200k", color: "text" },
-    { text: " · ↑48k ↓6.2k", color: "text" },
-    { text: " · cache 68%", color: "muted" },
+    { text: " | ↑48k ↓6.2k", color: "toolTitle" },
+    { text: " | cache 68%", color: "muted" },
   ]);
 });
 
@@ -147,11 +147,11 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
   assert.deepEqual(frags, [
     { text: "$", color: "dim" },
     { text: " 1.24 sess", color: "text" },
-    { text: " · 8.40 day", color: "muted" },
-    { text: " · 31.20 7d", color: "muted" },
-    { text: " · 118.75 30d", color: "muted" },
-    { text: " ▁▁▂▄▂▁▇", color: "accent" },
-    { text: " · $0.39/hr", color: "muted" },
+    { text: " | 8.40 day", color: "success" },
+    { text: " | 31.20 7d", color: "success" },
+    { text: " | 118.75 30d", color: "success" },
+    { text: " ▁▁▂▄▂▁▇", color: "success" },
+    { text: " | $0.39/hr", color: "muted" },
   ]);
 });
 
@@ -161,7 +161,7 @@ test("money row: burn rate renders — when fewer than 2 usage entries", () => {
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 5, count: 1 } }),
     ledger: LEDGER,
   })));
-  assert.ok(out.includes(" · —"));
+  assert.ok(out.includes(" | —"));
 });
 
 test("money row: sparkline omitted when display.sparkline=false", () => {

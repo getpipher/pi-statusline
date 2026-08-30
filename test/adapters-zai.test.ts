@@ -25,7 +25,7 @@ const QUOTA: QuotaResult = {
 test("renderZaiQuota produces the exact label-first format", () => {
   assert.equal(
     renderZaiQuota(QUOTA, NOW),
-    "zai ▕████████░░▏ 75% 1.5k/2.0k 5h · wk 15% · reset 2h55m",
+    "zai ▕████████░░▏ 75% 1.5k/2.0k 5h | wk 15% | reset 2h55m",
   );
 });
 

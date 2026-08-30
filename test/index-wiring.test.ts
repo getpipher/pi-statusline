@@ -175,7 +175,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
     assert.ok(lines.some((l) => l.includes("zai-quota-line")), "quota line present");
     assert.equal(h.colors.find((c) => c.text.includes("zai-quota-line"))?.color, "muted");
     // ambient
-    assert.match(flat, /fleet ready · memory warm/);
+    assert.match(flat, /fleet ready | memory warm/);
 
     // (2) provider switch zai → anthropic → quota line dimmed (A5-refined preserved).
     h.colors.length = 0;

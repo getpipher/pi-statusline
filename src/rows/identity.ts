@@ -24,8 +24,8 @@ export function createIdentityRow(): Row {
         frags.push({ text: s.sessionName.trim(), color: "text" });
       }
       frags.push({ text: `${frags.length > 0 ? " " : ""}${s.repoName}`, color: "dim" });
-      if (s.branch) frags.push({ text: ` ⎇ ${s.branch}`, color: "muted" });
-      frags.push({ text: ` · ${formatModelName(s.modelId)}`, color: "accent" });
+      if (s.branch) frags.push({ text: ` ⎇ ${s.branch}`, color: "toolTitle" });
+      frags.push({ text: ` | ${formatModelName(s.modelId)}`, color: "accent" });
       return frags;
     },
   };

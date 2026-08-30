@@ -28,7 +28,7 @@ export function renderZaiQuota(data: QuotaResult, now: number): string {
     (t): t is number => typeof t === "number",
   );
   if (resets.length > 0) parts.push(`reset ${formatReset(Math.min(...resets), now)}`);
-  return `zai ${parts.join(" · ")}`;
+  return `zai ${parts.join(" | ")}`;
 }
 
 export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<QuotaResult> {
