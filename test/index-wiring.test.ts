@@ -8,6 +8,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { activateStatusline } from "../src/index.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
 import type { ProviderRowAdapter } from "../src/adapters/types.ts";
+import type { DeenSource, DeenSnapshot } from "../src/deen/source.ts";
 
 type Handler = (...args: unknown[]) => unknown;
 type Command = { handler: (args: string | undefined, ctx: ExtensionContext) => Promise<void> };
@@ -291,6 +292,103 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
     assert.ok(h.counters.stopped > stoppedBeforeDispose, "dispose stops adapters");
     h.handlers.get("session_start")?.({}, h.ctx);
     assert.ok(h.footerHolder.current, "install guard cleared — session_start reinstalls");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P2 wiring: DeenSource lifecycle, snapshot.deen, /statusline deen command ──
+
+const DEEN_SNAPSHOT: DeenSnapshot = {
+  schedule: [
+    { name: "Fajr", wallMin: 276, minutesUntil: -300, state: "past" },
+    { name: "Dhuhr", wallMin: 720, minutesUntil: 120, state: "next" },
+    { name: "Asr", wallMin: 920, minutesUntil: 320, state: "upcoming" },
+    { name: "Maghrib", wallMin: 1080, minutesUntil: 500, state: "upcoming" },
+    { name: "Isha", wallMin: 1170, minutesUntil: 660, state: "upcoming" },
+  ],
+  escalation: "calm", hijri: "17 Rabīʿ al-awwal 1448", city: "Jakarta",
+  timezone: "Asia/Jakarta", staleMinutes: null,
+};
+
+test("v2 P2 wiring: deen source flows to the footer; session_start + deen command refresh; P2-19 bare money lead", async () => {
+  const h = makeHarness();
+  let deenRefreshes = 0;
+  let forcedRefreshes = 0;
+  const fakeDeen: DeenSource = {
+    current: () => DEEN_SNAPSHOT,
+    refresh: async (force?: boolean) => { deenRefreshes += 1; if (force) forcedRefreshes += 1; },
+    geo: () => null,
+  };
+  try {
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeAdapters: () => [h.fakeZaiAdapter],
+      deenCachePath: join(h.tmp, "deen-cache.json"),
+      makeDeenSource: () => fakeDeen,
+    });
+
+    // (1) session_start → deen source refreshed + the strip renders with hijri + city.
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(deenRefreshes >= 1, "session_start refreshes the deen source");
+    assert.ok(h.footerHolder.current, "footer installed");
+    const lines = h.footerHolder.current.render(500);
+    const flat = lines.join("\n");
+    assert.match(flat, /deen .*Fajr .*✓.*Dhuhr.*(2h)/, "deen strip with past ✓ + next countdown");
+    assert.match(flat, /17 Rabīʿ al-awwal 1448/, "hijri flowed via snapshot.deen");
+    assert.match(flat, /Jakarta/, "city flowed via snapshot.deen");
+
+    // (2) reinstall scenario: a second session_start refreshes again (source survives).
+    const before = deenRefreshes;
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(deenRefreshes > before, "second session_start refreshes the deen source again");
+
+    // P2-19: default wiring passes no repo accessor → repoCost 0 → money row starts
+    // with the bare "$X.XX sess" lead (no REPO, no orphan " | " separator).
+    const moneyLine = lines.find((l) => l.includes(" sess"));
+    assert.ok(moneyLine, "money line present");
+    assert.ok(!moneyLine.includes("REPO"), "no REPO lead when repoCost is 0");
+    assert.ok(!/^\s*\|/.test(moneyLine), "no orphan leading separator");
+
+    // (3) /statusline deen Mecca → persisted + notified + forced refresh.
+    const command = h.commands.get("statusline");
+    assert.ok(command);
+    await command.handler("deen Mecca", h.ctx);
+    const persisted = JSON.parse(readFileSync(h.configPath, "utf8")) as { deen: { city: string } };
+    assert.equal(persisted.deen.city, "Mecca");
+    assert.ok(h.notifications.some((n) => n.message.includes("Deen location set to Mecca")), "notify sent");
+    assert.ok(forcedRefreshes >= 1, "forced (force=true) refresh after setting the city");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
+  const h = makeHarness();
+  const fakeNull: DeenSource = {
+    current: () => null,
+    refresh: async () => {},
+    geo: () => null,
+  };
+  try {
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeAdapters: () => [h.fakeZaiAdapter],
+      deenCachePath: join(h.tmp, "deen-cache.json"),
+      makeDeenSource: () => fakeNull,
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    const lines = h.footerHolder.current!.render(500);
+    assert.ok(lines.length >= 4, "other rows unaffected");
+    assert.ok(!lines.some((l) => l.includes("Fajr") || l.includes("Rabīʿ")), "deen line absent when current() is null");
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });
