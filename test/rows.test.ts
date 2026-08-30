@@ -101,7 +101,7 @@ test("ctx row: bar + percent + window + tokens + cache hit", () => {
   const frags = row.render(snap({ session: CTX_SESSION }))!;
   assert.deepEqual(frags, [
     { text: "ctx", color: "dim" },
-    { text: "▕███", color: "accent" },
+    { text: " ▕███", color: "accent" },
     { text: "░░░░░░░▏", color: "dim" },
     { text: " 34%", color: "text" },
     { text: " 68k/200k", color: "text" },

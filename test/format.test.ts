@@ -68,7 +68,7 @@ test("formatReset renders countdown buckets (moved from segments/quota.ts)", () 
 
 test("splitBar splits a 10-cell bar into an accent-fillable head and dim tail", () => {
   assert.deepEqual(splitBar(0), { filled: "▕", empty: "░░░░░░░░░░▏" });
-  assert.deepEqual(splitBar(0.34), { filled: "▕███", empty: "░░░░░░░▏" });
+  assert.deepEqual(splitBar(0.34), { filled: "▕███", empty: "░░░░░░░▏" }); // row prepends the leading space
   assert.deepEqual(splitBar(0.75), { filled: "▕████████", empty: "░░▏" });
   assert.deepEqual(splitBar(1), { filled: "▕██████████", empty: "▏" });
   assert.deepEqual(splitBar(1.5), { filled: "▕██████████", empty: "▏" });

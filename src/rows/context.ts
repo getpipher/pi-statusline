@@ -27,7 +27,7 @@ export function createContextRow(): Row {
         const pct = ratio * 100;
         const fillColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "accent";
         const { filled, empty } = splitBar(ratio);
-        frags.push({ text: filled, color: fillColor });
+        frags.push({ text: ` ${filled}`, color: fillColor });
         frags.push({ text: empty, color: "dim" });
       }
       if (showPct) {
