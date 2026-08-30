@@ -10,13 +10,14 @@ export function createMoneyRow(): Row {
     render(snapshot: RowSnapshot): Fragment[] | null {
       const { usage } = snapshot.session;
       const ledger = snapshot.ledger;
-      const frags: Fragment[] = [{ text: "$", color: "dim" }];
-
+      // CC-style shape: no standalone "$" label — folded into each value; REPO leads when > 0.
+      const frags: Fragment[] = [];
+      if (ledger.repoCost > 0) frags.push({ text: `REPO $${formatMoney(ledger.repoCost)}`, color: "text" });
       // Session cost is pi-native real data (D4) — works for every provider.
-      frags.push({ text: ` ${formatMoney(usage.cost)} sess`, color: "text" });
-      frags.push({ text: ` | ${formatMoney(ledger.todayCost)} day`, color: "success" });
-      frags.push({ text: ` | ${formatMoney(ledger.last7Cost)} 7d`, color: "success" });
-      frags.push({ text: ` | ${formatMoney(ledger.last30Cost)} 30d`, color: "success" });
+      frags.push({ text: `${frags.length ? " | " : ""}$${formatMoney(usage.cost)} sess`, color: "text" });
+      frags.push({ text: ` | $${formatMoney(ledger.todayCost)} day`, color: "success" });
+      frags.push({ text: ` | $${formatMoney(ledger.last7Cost)} 7d`, color: "success" });
+      frags.push({ text: ` | $${formatMoney(ledger.last30Cost)} 30d`, color: "success" });
 
       if (snapshot.config.display.sparkline) {
         const spark = renderSparkline(ledger.daily);

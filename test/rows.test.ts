@@ -135,6 +135,7 @@ const LEDGER = {
   last7Cost: 31.2,
   last30Cost: 118.75,
   daily: [1, 2, 3, 5, 3, 2, 8.4],
+  repoCost: 12.34,
 };
 
 test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
@@ -145,12 +146,13 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
   }))!;
   // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → level = max(0, floor(v/max*7)-1)
   // (Task 1's pinned mapping) → ▁▁▂▄▂▁▇. Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
+  // CC-style shape (reconciled): no standalone "$" label — folded into each value; REPO lead when repoCost > 0.
   assert.deepEqual(frags, [
-    { text: "$", color: "dim" },
-    { text: " 1.24 sess", color: "text" },
-    { text: " | 8.40 day", color: "success" },
-    { text: " | 31.20 7d", color: "success" },
-    { text: " | 118.75 30d", color: "success" },
+    { text: "REPO $12.34", color: "text" },
+    { text: " | $1.24 sess", color: "text" },
+    { text: " | $8.40 day", color: "success" },
+    { text: " | $31.20 7d", color: "success" },
+    { text: " | $118.75 30d", color: "success" },
     { text: " ▁▁▂▄▂▁▇", color: "success" },
     { text: " | $0.39/hr", color: "muted" },
   ]);
@@ -173,4 +175,14 @@ test("money row: sparkline omitted when display.sparkline=false", () => {
     config: { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, sparkline: false } },
   });
   assert.ok(!plain(row.render(cfgSnap)).includes("▁"));
+});
+
+test("money row: REPO all-time total leads the row in bright text", () => {
+  const row = createMoneyRow();
+  const frags = row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
+    ledger: { ...LEDGER, repoCost: 11529.35 },
+  }))!;
+  assert.deepEqual(frags[0], { text: "REPO $11529.35", color: "text" });
+  assert.deepEqual(frags[1], { text: " | $1.24 sess", color: "text" });
 });

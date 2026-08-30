@@ -8,6 +8,7 @@ export interface LedgerLine {
   ts: number; // ms-epoch
   provider: string;
   model: string;
+  repo: string; // cwd basename at write time; "unknown" pre-P2 / no accessor (never counts toward repoCost)
   input: number;
   output: number;
   cacheRead: number;
@@ -21,12 +22,14 @@ export interface LedgerSnapshot {
   last7Cost: number;
   last30Cost: number;
   daily: number[]; // last 7 local-day sums, oldest → newest (sparkline input)
+  repoCost: number; // all-time sum for the CURRENT repo (0 when no repo accessor / unknown)
 }
 
 export interface LedgerStoreOpts {
   filePath: string;
   now?: () => number;
   utcOffsetMinutes?: number; // fixed-offset day boundary; default = host local offset
+  repo?: () => string; // current repo name (cwd basename); absent → lines record "unknown", repoCost 0
   warn?: (message: string) => void;
 }
 
@@ -52,6 +55,7 @@ function parseLine(raw: string): LedgerLine | null {
       ts: p.ts,
       provider: str(p.provider, "unknown"),
       model: str(p.model, "unknown"),
+      repo: str(p.repo, "unknown"),
       input: num(p.input),
       output: num(p.output),
       cacheRead: num(p.cacheRead),
@@ -103,6 +107,7 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
       // P1 records "unknown" for both — pi usage entries carry no per-entry attribution.
       provider: "unknown",
       model: "unknown",
+      repo: opts.repo?.() ?? "unknown",
       input: u.input ?? 0,
       output: u.output ?? 0,
       cacheRead: u.cacheRead ?? 0,
@@ -171,11 +176,19 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
       };
       const daily: number[] = [];
       for (let d = todayIdx - 6; d <= todayIdx; d++) daily.push(byDay.get(d) ?? 0);
+      // All-time total for the CURRENT repo only. Legacy/unattributed lines ("unknown")
+      // and other repos never count — and an absent repo accessor (current "unknown")
+      // yields 0, never a mixed-repo sum.
+      const currentRepo = opts.repo?.() ?? "unknown";
+      const repoCost = currentRepo === "unknown"
+        ? 0
+        : lines.filter((l) => l.repo === currentRepo).reduce((sum, l) => sum + l.cost, 0);
       return {
         todayCost: byDay.get(todayIdx) ?? 0,
         last7Cost: sumDays(todayIdx - 6, todayIdx),
         last30Cost: sumDays(todayIdx - 29, todayIdx),
         daily,
+        repoCost,
       };
     },
   };
