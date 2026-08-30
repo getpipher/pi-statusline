@@ -15,6 +15,17 @@ export function renderBar(ratio: number, cells = 10): string {
   return `▕${"█".repeat(filled)}${"░".repeat(cells - filled)}▏`;
 }
 
+// Two-tone bar: head (`▕` + filled cells) takes the fill color (accent/warning/error),
+// tail (empty cells + `▏`) stays dim — renderBar above stays for plain-string formats.
+export function splitBar(ratio: number, cells = 10): { filled: string; empty: string } {
+  const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
+  const filledCount = Math.round(clamped * cells);
+  return {
+    filled: `▕${"█".repeat(filledCount)}`,
+    empty: `${"░".repeat(cells - filledCount)}▏`,
+  };
+}
+
 const SPARK_LEVELS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇"] as const;
 
 export function renderSparkline(values: number[]): string {

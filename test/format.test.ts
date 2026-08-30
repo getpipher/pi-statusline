@@ -9,6 +9,7 @@ import {
   renderBar,
   renderSparkline,
   formatReset,
+  splitBar,
 } from "../src/format.ts";
 
 test("formatTokenCount formats <1k plain and k-values with one decimal under 10k", () => {
@@ -63,4 +64,14 @@ test("formatReset renders countdown buckets (moved from segments/quota.ts)", () 
   assert.equal(formatReset(now - 1, now), "now");
   assert.equal(formatReset(now + 2 * 3_600_000 + 55 * 60_000, now), "2h55m");
   assert.equal(formatReset(now + 26 * 3_600_000, now), "1d2h");
+});
+
+test("splitBar splits a 10-cell bar into an accent-fillable head and dim tail", () => {
+  assert.deepEqual(splitBar(0), { filled: "▕", empty: "░░░░░░░░░░▏" });
+  assert.deepEqual(splitBar(0.34), { filled: "▕███", empty: "░░░░░░░▏" });
+  assert.deepEqual(splitBar(0.75), { filled: "▕████████", empty: "░░▏" });
+  assert.deepEqual(splitBar(1), { filled: "▕██████████", empty: "▏" });
+  assert.deepEqual(splitBar(1.5), { filled: "▕██████████", empty: "▏" });
+  assert.deepEqual(splitBar(-1), { filled: "▕", empty: "░░░░░░░░░░▏" });
+  assert.deepEqual(splitBar(Number.NaN), { filled: "▕", empty: "░░░░░░░░░░▏" });
 });

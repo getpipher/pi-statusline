@@ -101,10 +101,11 @@ test("ctx row: bar + percent + window + tokens + cache hit", () => {
   const frags = row.render(snap({ session: CTX_SESSION }))!;
   assert.deepEqual(frags, [
     { text: "ctx", color: "dim" },
-    { text: " ▕███░░░░░░░▏", color: "muted" },
-    { text: " 34%", color: "muted" },
-    { text: " 68k/200k", color: "muted" },
-    { text: " · ↑48k ↓6.2k", color: "muted" },
+    { text: "▕███", color: "accent" },
+    { text: "░░░░░░░▏", color: "dim" },
+    { text: " 34%", color: "text" },
+    { text: " 68k/200k", color: "text" },
+    { text: " · ↑48k ↓6.2k", color: "text" },
     { text: " · cache 68%", color: "muted" },
   ]);
 });
@@ -145,7 +146,7 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
   // (Task 1's pinned mapping) → ▁▁▂▄▂▁▇. Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
   assert.deepEqual(frags, [
     { text: "$", color: "dim" },
-    { text: " 1.24 sess", color: "muted" },
+    { text: " 1.24 sess", color: "text" },
     { text: " · 8.40 day", color: "muted" },
     { text: " · 31.20 7d", color: "muted" },
     { text: " · 118.75 30d", color: "muted" },
