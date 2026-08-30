@@ -145,6 +145,7 @@ export function activateStatusline(
             ledger: ledger.getSnapshot(),
             statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
+            deen: null, // P2 Task 8 wires DeenSource here
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           // One theme pass: fragment colors → theme.fg; fragments own all spacing.

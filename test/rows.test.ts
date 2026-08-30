@@ -15,6 +15,7 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     ledger: null as never,
     statuses: "",
     config: DEFAULT_CONFIG,
+    deen: null,
     ...partial,
   };
 }
