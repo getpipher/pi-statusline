@@ -57,6 +57,8 @@ export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<Quota
       return poller!.get();
     },
     render: (data, _dim) => renderZaiQuota(data, Date.now()),
+    // Heat = 5h window usage (weekly fallback) — mirrors the ctx row's escalation bands.
+    heat: (data) => data.fiveHour?.percentage ?? data.weekly?.percentage ?? null,
     start() {
       if (!ensurePoller()) return;
       poller!.start();

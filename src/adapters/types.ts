@@ -7,6 +7,9 @@ export interface ProviderRowAdapter<D = unknown> {
   current(): D | null;            // last-good data (poller cache); null = row omitted
   fetch(): Promise<D | null>;     // forced refresh (/statusline refresh)
   render(data: D, dim: boolean): string; // one row line, label-first
+  // Usage heat 0..100 for the row tint (accent <70%, warning ≥70%, error ≥90%);
+  // absent or null → neutral muted. Optional so trivial adapters can skip it.
+  heat?(data: D): number | null;
   start(): void;                  // begin background polling (no-op when unconfigured)
   stop(): void;
 }

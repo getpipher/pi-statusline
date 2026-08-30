@@ -108,9 +108,34 @@ test("quota row: renders the adapter line; dimmed when active provider ≠ adapt
   };
   const row = createQuotaRow([zai]);
   const active = row.render(snap({}))!;
+  // No heat() on this adapter → neutral muted.
   assert.deepEqual(active, [{ text: renderZaiQuota(QUOTA, NOW), color: "muted" }]);
   const inactive = row.render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider: "anthropic" } }))!;
   assert.deepEqual(inactive, [{ text: `${renderZaiQuota(QUOTA, NOW)}!`, color: "dim" }]);
+});
+
+test("quota row: heat tints the line — accent <70, warning ≥70, error ≥90; dim wins when inactive", () => {
+  const mk = (percentage: number): ProviderRowAdapter<QuotaResult> => ({
+    id: "zai", matches: (p) => p === "zai", current: () => ({ ...QUOTA, fiveHour: { ...QUOTA.fiveHour!, percentage } }),
+    fetch: async () => null, render: () => "zai-line", heat: (d) => d.fiveHour?.percentage ?? null, start() {}, stop() {},
+  });
+  const row = createQuotaRow([]);
+  const render = (percentage: number, provider = "zai") =>
+    createQuotaRow([mk(percentage)]).render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider } }))!;
+  assert.deepEqual(render(69), [{ text: "zai-line", color: "accent" }]);
+  assert.deepEqual(render(70), [{ text: "zai-line", color: "warning" }]);
+  assert.deepEqual(render(90), [{ text: "zai-line", color: "error" }]);
+  // Heat is reported but the line stays dim while the adapter is not the active provider.
+  assert.deepEqual(render(90, "anthropic"), [{ text: "zai-line", color: "dim" }]);
+});
+
+test("quota row: null/NaN heat falls back to neutral muted", () => {
+  const mk = (heat: () => number | null): ProviderRowAdapter<QuotaResult> => ({
+    id: "zai", matches: (p) => p === "zai", current: () => QUOTA,
+    fetch: async () => null, render: () => "zai-line", heat, start() {}, stop() {},
+  });
+  assert.deepEqual(createQuotaRow([mk(() => null)]).render(snap({})), [{ text: "zai-line", color: "muted" }]);
+  assert.deepEqual(createQuotaRow([mk(() => Number.NaN)]).render(snap({})), [{ text: "zai-line", color: "muted" }]);
 });
 
 test("quota row: null when no adapter has data", () => {
