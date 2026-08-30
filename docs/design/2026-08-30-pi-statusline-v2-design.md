@@ -209,7 +209,31 @@ interface ProviderRowAdapter {
 ## 14. References
 
 - CC statusline repo: `~/local-dev/rz1989s/claude-code-statusline` (AGENTS.md = capability map; live render captured in §3)
+- Parity research (2026-08-30, per RECTOR request — 1:1 feature diff): [`.superpowers/research/cc-statusline-features.md`](../../.superpowers/research/cc-statusline-features.md) — exact CC formulas for Est/REPO/burn/cache-hit/commits
 - Mockups: `.superpowers/brainstorm/37499-1788038123/content/` (approved Editorial Dashboard proofs, 3 provider scenarios)
 - v1 design: [2026-08-12-pi-statusline-design.md](2026-08-12-pi-statusline-design.md) · v1 plan: [../plans/2026-08-12-pi-statusline-v1.md](../plans/2026-08-12-pi-statusline-v1.md)
 - Memory: `~/.pi/agent/memory/-Users-rector-local-dev-getpipher-pi-statusline/pi-runtime-shapes-and-quota-api.md`
 - OpenRouter credits endpoint: `https://openrouter.ai/api/v1/credits` (Bearer key) · Prayer: `https://aladhan.com/prayer-times-api` (timingsByCity; hijri included)
+
+---
+
+## 15. Addendum (2026-08-30, post-P1) — CC parity scope additions
+
+Driven by RECTOR's 1:1 parity request against CC v2.27.1 (screenshot + source research, §14). Three features were missing from the plan; slots assigned:
+
+### P2 (v0.3.0) additions
+- **Ledger `repo` field** — lines gain `"repo": "<cwd-basename>"` at reconcile time (back-compat: `parseLine` defaults missing → `"unknown"`; old lines stay unattributed). Ship EARLY — unattributed history grows every day it slips.
+- **`REPO $X` all-time total** — money row gains a repo-scoped cumulative fragment: sum over ledger where `repo == current` (CC: `calculate_native_repo_cost`, all-time, no mtime filter). Render: `REPO $12.34` leading the money row (bright), before `sess`.
+- **Prayer strip = full CC-style render** — `Fajr 04:36 ✓ · Dhuhr 11:53 (3h 45m) · Asr 15:11 · Maghrib 17:52 · Isha 19:02` (all five, ✓ past, `(h m)` countdown on next, next prayer highlighted per §8 escalation). Replaces the next-prayer-first single-line render in §8; escalation + hijri + city unchanged.
+
+### P3 (v0.4.0) additions
+- **`Est` (block projection)** — CC formula: `current + rate_per_hour × remaining_minutes / 60`. pi adaptation: **z.ai quota-credit projection to window reset** as primary (we hold currentValue/percentage/nextResetTime — project `currentValue + burn × remaining` as credits + %), $ cost projection as secondary for metered providers. Render: `est 3.2k (94%)` appended to the quota row; row omitted with the quota row when no adapter.
+- **Burn anchor option** — CC anchors burn to the 5h block start; ours uses session span. P3: when zai window data exists, offer block-anchored burn (`window cost / elapsed minutes × 60` analog with credits) via config (`display.burnAnchor: "session" | "block"`, default session).
+- **Version stamps** — `SL:<self>` from our `package.json` version (trivial); `PI:<host>` host version pending an accessor check (extension API or pi package version at runtime; if inaccessible, self-only). Config-gated ambient fragment (`display.showVersions`, default false).
+
+### Confirmed non-goals (CC parity intentionally skipped)
+- `Plugin:*` / `Native:*` rows — CC-host concepts; pi equivalents (extension statuses) already surfaced in the ambient row.
+- Emoji icons — width jitter (CC's known weakness); themed glyphs only.
+
+### Shipped through v0.2.3 (for parity accounting)
+identity/branch/model, ctx bar + % + tokens + cache-hit, day/7d/30d + sparkline + burn, zai quota heat, clock + coding span, extension statuses, pipes, multi-hue palette. **CC-parity score: 11 of 14 feature groups live; 3 planned (P2/P3 above); 2 deliberately skipped.**
