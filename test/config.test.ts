@@ -22,6 +22,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
   assert.deepEqual(DEFAULT_CONFIG, {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
+    deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
     display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true },
   });
 });
@@ -124,10 +125,26 @@ test("v1 back-compat: a v1 file (no rows/bars/sparkline) loads cleanly with defa
     zai: { tier: "pro", pollIntervalMs: 60_000 },
     display: { showTokens: false, showContext: true, showGit: true },
   }));
-  const { config, unknownRows } = loadConfig(path);
-  assert.equal(config.zai.tier, "pro");
-  assert.equal(config.zai.pollIntervalMs, 60_000);
-  assert.equal(config.display.showTokens, false);
-  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  const { config: cfg, unknownRows } = loadConfig(path);
+  assert.equal(cfg.zai.tier, "pro");
+  assert.equal(cfg.zai.pollIntervalMs, 60_000);
+  assert.equal(cfg.display.showTokens, false);
+  assert.deepEqual(cfg.display.rows, [...KNOWN_ROW_IDS]);
   assert.deepEqual(unknownRows, []);
+});
+
+// ── v2.1: deen section ──
+
+test("v2.1: deen defaults and back-compat (files without deen)", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({}));
+  const { config } = loadConfig(path);
+  assert.deepEqual(config.deen, { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 });
+});
+
+test("v2.1: deen section parses; escalateMinutes guarded positive; city auto allowed", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({ deen: { city: "auto", country: "Singapore", method: "11", escalateMinutes: -5 } }));
+  const { config } = loadConfig(path);
+  assert.deepEqual(config.deen, { city: "auto", country: "Singapore", method: "11", escalateMinutes: 30 });
 });

@@ -42,3 +42,11 @@ test("parseStatuslineArgs: unknown command → error", () => {
   const result = parseStatuslineArgs("bogus-command");
   assert.equal(result.action, "error");
 });
+
+// ── v2.1: deen subcommand ──
+
+test("deen subcommand parses city or auto; bare deen errors with usage", () => {
+  assert.deepEqual(parseStatuslineArgs("deen Mecca"), { action: "set-deen-city", city: "Mecca" });
+  assert.deepEqual(parseStatuslineArgs("deen auto"), { action: "set-deen-city", city: "auto" });
+  assert.deepEqual(parseStatuslineArgs("deen"), { action: "error", message: "usage: /statusline deen <city|auto>" });
+});
