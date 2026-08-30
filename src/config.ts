@@ -1,6 +1,7 @@
 // src/config.ts
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { KNOWN_ROW_IDS, type RowId } from "./types.ts";
 
 export interface StatuslineConfig {
   enabled: boolean;
@@ -9,6 +10,9 @@ export interface StatuslineConfig {
     pollIntervalMs: number;
   };
   display: {
+    rows: RowId[];          // display order; subset/reorder of the registry, never invents
+    bars: boolean;
+    sparkline: boolean;
     showTokens: boolean;
     showContext: boolean;
     showGit: boolean;
@@ -16,30 +20,44 @@ export interface StatuslineConfig {
   };
 }
 
+export interface ConfigLoadResult {
+  config: StatuslineConfig;
+  unknownRows: string[]; // display.rows entries not in KNOWN_ROW_IDS — surface via one-time notify
+}
+
 export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
-  display: { showTokens: true, showContext: true, showGit: true, showSession: true },
+  display: {
+    rows: [...KNOWN_ROW_IDS],
+    bars: true,
+    sparkline: true,
+    showTokens: true,
+    showContext: true,
+    showGit: true,
+    showSession: true,
+  },
 };
 
 const VALID_TIERS = ["auto", "lite", "pro", "max"] as const;
 
-export function loadConfig(path: string): StatuslineConfig {
+export function loadConfig(path: string): ConfigLoadResult {
+  const unknownRows: string[] = [];
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
   } catch {
-    return structuredClone(DEFAULT_CONFIG);
+    return { config: structuredClone(DEFAULT_CONFIG), unknownRows };
   }
 
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    return structuredClone(DEFAULT_CONFIG);
+    return { config: structuredClone(DEFAULT_CONFIG), unknownRows };
   }
   if (!parsed || typeof parsed !== "object") {
-    return structuredClone(DEFAULT_CONFIG);
+    return { config: structuredClone(DEFAULT_CONFIG), unknownRows };
   }
 
   const cfg = structuredClone(DEFAULT_CONFIG);
@@ -65,9 +83,22 @@ export function loadConfig(path: string): StatuslineConfig {
     if (typeof d.showContext === "boolean") cfg.display.showContext = d.showContext;
     if (typeof d.showGit === "boolean") cfg.display.showGit = d.showGit;
     if (typeof d.showSession === "boolean") cfg.display.showSession = d.showSession;
+    if (typeof d.bars === "boolean") cfg.display.bars = d.bars;
+    if (typeof d.sparkline === "boolean") cfg.display.sparkline = d.sparkline;
+    if (Array.isArray(d.rows)) {
+      const valid: RowId[] = [];
+      for (const id of d.rows) {
+        if (typeof id === "string" && (KNOWN_ROW_IDS as readonly string[]).includes(id)) {
+          valid.push(id as RowId);
+        } else if (typeof id === "string" && !unknownRows.includes(id)) {
+          unknownRows.push(id); // D6: unknown ids dropped + reported — surfaces typos
+        }
+      }
+      if (valid.length > 0) cfg.display.rows = valid;
+    }
   }
 
-  return cfg;
+  return { config: cfg, unknownRows };
 }
 
 export function saveConfig(path: string, cfg: StatuslineConfig): void {

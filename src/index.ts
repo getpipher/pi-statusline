@@ -4,30 +4,40 @@ import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { loadConfig, saveConfig, type StatuslineConfig } from "./config.ts";
-import { readZaiKey, createQuotaPoller, type QuotaPoller } from "./quota/zai.ts";
-import { isZaiProvider } from "./provider.ts";
-import { renderTokensSegment } from "./segments/tokens.ts";
-import { renderContextSegment } from "./segments/context.ts";
-import { renderQuotaSegment } from "./segments/quota.ts";
-import { renderSessionSegment } from "./segments/session.ts";
-import { composeSegments, truncateSegments } from "./footer.ts";
+import { readZaiKey } from "./quota/zai.ts";
+import { createSessionStore, type SessionStore } from "./session/store.ts";
+import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
+import { createZaiAdapter } from "./adapters/zai.ts";
+import type { ProviderRowAdapter } from "./adapters/types.ts";
+import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
+import { createIdentityRow } from "./rows/identity.ts";
+import { createContextRow } from "./rows/context.ts";
+import { createMoneyRow } from "./rows/money.ts";
+import { createQuotaRow } from "./rows/quota.ts";
+import { createAmbientRow } from "./rows/ambient.ts";
+import { createTicker, type Ticker } from "./ticker.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-statusline.json");
+const LEDGER_PATH = join(homedir(), ".pi", "agent", "pi-statusline", "ledger.jsonl");
 
 export interface StatuslineRuntimeDependencies {
   authJsonPath: string;
   configPath: string;
+  ledgerPath: string;
   readKey: typeof readZaiKey;
-  makePoller: typeof createQuotaPoller;
+  makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
 }
 
 const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
   authJsonPath: AUTH_JSON,
   configPath: CONFIG_PATH,
+  ledgerPath: LEDGER_PATH,
   readKey: readZaiKey,
-  makePoller: createQuotaPoller,
+  makeAdapters: ({ authJsonPath, readKey, config, onRefresh }) => [
+    createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
+  ],
 };
 
 export function activateStatusline(
@@ -35,48 +45,88 @@ export function activateStatusline(
   dependencyOverrides: Partial<StatuslineRuntimeDependencies> = {},
 ): void {
   const dependencies = { ...DEFAULT_DEPENDENCIES, ...dependencyOverrides };
-  let config = loadConfig(dependencies.configPath);
-  let poller: QuotaPoller | null = null;
-  let requestRenderFn: (() => void) | null = null;
+  const loaded = loadConfig(dependencies.configPath);
+  let config = loaded.config;
+  const pendingRowWarnings = new Set(loaded.unknownRows);
+  const notifiedRowWarnings = new Set<string>();
+
   let sessionCtx: ExtensionContext | null = null;
-  let activeModel: { provider: string | undefined; id: string | undefined } = {
-    provider: undefined,
-    id: undefined,
-  };
+  let sessionStore: SessionStore = createSessionStore();
+  let ledgerStore: LedgerStore | null = null;
+  let adapters: ProviderRowAdapter<any>[] = [];
+  let registry = createRowRegistry([]);
+  let ticker: Ticker | null = null;
+  let requestRenderFn: (() => void) | null = null;
   let footerInstalled = false;
 
-  function startPoller(): void {
-    stopPoller();
-    const apiKey = dependencies.readKey(dependencies.authJsonPath);
-    if (!apiKey) return;
-
-    poller = dependencies.makePoller({
-      apiKey,
-      intervalMs: config.zai.pollIntervalMs,
+  function buildAdapters(): void {
+    for (const a of adapters) a.stop();
+    adapters = dependencies.makeAdapters({
+      authJsonPath: dependencies.authJsonPath,
+      readKey: dependencies.readKey,
+      config: () => config,
       onRefresh: () => requestRenderFn?.(),
     });
-    poller.start();
+    registry = createRowRegistry([
+      createIdentityRow(),
+      createContextRow(),
+      createMoneyRow(),
+      createQuotaRow(adapters),
+      createAmbientRow(),
+    ]);
+    if (config.enabled) for (const a of adapters) a.start();
   }
 
-  function stopPoller(): void {
-    poller?.stop();
-    poller = null;
+  function ensureLedger(): LedgerStore {
+    if (!ledgerStore) {
+      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath });
+      ledgerStore.load();
+    }
+    return ledgerStore;
+  }
+
+  function startTicker(): void {
+    ticker?.stop();
+    ticker = createTicker({
+      intervalMs: 30_000,
+      onTick: () => {
+        if (sessionCtx) {
+          ensureLedger().reconcile(sessionCtx.sessionManager.getEntries());
+        }
+        requestRenderFn?.();
+      },
+    });
+    ticker.start();
+  }
+
+  function stopTicker(): void {
+    ticker?.stop();
+    ticker = null;
+  }
+
+  function drainRowWarnings(): void {
+    if (!sessionCtx) return;
+    for (const id of pendingRowWarnings) {
+      if (notifiedRowWarnings.has(id)) continue;
+      notifiedRowWarnings.add(id);
+      sessionCtx.ui.notify(`pi-statusline: unknown display.rows id "${id}" — dropped (valid: identity, ctx, money, quota, deen, ambient)`, "warning");
+    }
+    pendingRowWarnings.clear();
   }
 
   function installFooter(ctx: ExtensionContext): void {
     if (footerInstalled) return;
-    activeModel = { provider: ctx.model?.provider, id: ctx.model?.id };
     ctx.ui.setFooter((tui, theme, footerData) => {
       requestRenderFn = () => tui.requestRender();
-
       const unsub = footerData.onBranchChange(() => tui.requestRender());
 
       return {
         dispose: () => {
           unsub();
-          stopPoller();
+          for (const a of adapters) a.stop();
+          stopTicker();
           // pi may dispose the footer at session end — clear the install guard so the
-          // next session_start reinstalls (and the stale render fn can't fire after dispose).
+          // next session_start reinstalls (v1 lesson).
           footerInstalled = false;
           requestRenderFn = null;
         },
@@ -84,61 +134,21 @@ export function activateStatusline(
           tui.requestRender();
         },
         render(width: number): string[] {
-          // ExtensionContext exposes the active model as live state. Keep event state as
-          // a fallback for hosts that update model_select before refreshing the context.
-          const modelProvider = ctx.model?.provider ?? activeModel.provider;
-          const modelId = ctx.model?.id ?? activeModel.id;
-          activeModel = { provider: modelProvider, id: modelId };
           const branch = footerData.getGitBranch();
-          // FooterData has no status-change subscription. Statuses refresh on normal TUI
-          // renders, branch/model changes, and quota refreshes without adding a timer.
-          const statuses = [...footerData.getExtensionStatuses().values()]
-            .filter(Boolean)
-            .join(" · ");
-
-          let tokensStr = "";
-          if (config.display.showTokens) {
-            // getEntries() is Pi's complete session-entry accessor and is also what
-            // the native footer uses for cumulative assistant usage totals.
-            tokensStr = renderTokensSegment(ctx.sessionManager.getEntries());
-          }
-
-          let ctxPct = "";
-          if (config.display.showContext) {
-            ctxPct = renderContextSegment(ctx.getContextUsage());
-          }
-
-          // A5 quota dimming: bright when the session draws on the z.ai plan,
-          // dimmed when the active provider is something else (subscription status).
-          const quotaDimmed = !isZaiProvider(modelProvider);
-          const quotaStr = renderQuotaSegment(poller?.get() ?? null, quotaDimmed);
-
-          // Build the canonical segment ARRAY, truncate it, THEN join —
-          // never re-split a joined string (quota segment contains spaces).
-          const segs = composeSegments({
-            modelId,
-            sessionName: config.display.showSession
-              ? renderSessionSegment(ctx.sessionManager.getSessionName?.())
-              : "",
-            gitBranch: branch,
-            tokens: tokensStr,
-            ctxPct,
-            statuses,
-            quota: quotaStr || null,
+          sessionStore.update(ctx, branch);
+          const ledger = ensureLedger();
+          ledger.reconcile(ctx.sessionManager.getEntries());
+          const snapshot: RowSnapshot = {
+            now: Date.now(),
+            width,
+            session: sessionStore.getSnapshot(),
+            ledger: ledger.getSnapshot(),
+            statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" · "),
             config,
-          });
-          const kept = truncateSegments(segs, width);
-
-          // Theme: model badge accent; quota dim only when dimmed; rest muted.
-          const modelBadge = segs[0]!;
-          const line = kept
-            .map((seg) => {
-              if (quotaStr && seg === quotaStr) return theme.fg(quotaDimmed ? "dim" : "text", seg);
-              if (seg === modelBadge) return theme.fg("accent", seg);
-              return theme.fg("muted", seg);
-            })
-            .join(" ");
-          return [line];
+          };
+          const lines = renderRows(registry, config.display.rows, snapshot);
+          // One theme pass: fragment colors → theme.fg; fragments own all spacing.
+          return lines.map((frags) => frags.map((f) => theme.fg(f.color, f.text)).join(""));
         },
       };
     });
@@ -146,62 +156,70 @@ export function activateStatusline(
   }
 
   function reloadConfig(): void {
-    config = loadConfig(dependencies.configPath);
+    const reloaded = loadConfig(dependencies.configPath);
+    config = reloaded.config;
+    for (const id of reloaded.unknownRows) pendingRowWarnings.add(id);
     if (config.enabled) {
-      startPoller();
-      if (sessionCtx) installFooter(sessionCtx);
+      buildAdapters(); // restarts adapters so pollIntervalMs changes take effect
+      if (sessionCtx) {
+        installFooter(sessionCtx);
+        drainRowWarnings();
+      }
+      startTicker();
     } else {
-      stopPoller();
+      for (const a of adapters) a.stop();
+      stopTicker();
     }
     requestRenderFn?.();
   }
 
-  // Wire footer + poller on session start
   pi.on("session_start", (_event, ctx: ExtensionContext) => {
     sessionCtx = ctx;
     if (config.enabled) {
+      sessionStore = createSessionStore(); // fresh span per session
+      ensureLedger().reconcile(ctx.sessionManager.getEntries());
+      buildAdapters();
       installFooter(ctx);
-      startPoller();
+      drainRowWarnings();
+      startTicker();
     }
   });
 
-  // Update model state and re-render on provider/model switches.
-  pi.on("model_select", (event) => {
-    activeModel = { provider: event.model.provider, id: event.model.id };
+  pi.on("model_select", (_event) => {
+    // SessionStore pulls ctx.model per render; the event just forces a re-render.
     requestRenderFn?.();
   });
 
-  // Register /statusline command
   pi.registerCommand("statusline", {
     description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
-
       switch (action.action) {
         case "open-panel":
           ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max>", "info");
           break;
-        case "refresh":
-          if (poller) {
-            await poller.refresh();
-            requestRenderFn?.();
-            ctx.ui.notify("Quota refreshed", "info");
-          } else {
-            ctx.ui.notify("z.ai not configured — no poller running", "warning");
+        case "refresh": {
+          if (adapters.length === 0) {
+            ctx.ui.notify("No provider adapters configured", "warning");
+            break;
           }
+          for (const a of adapters) await a.fetch();
+          requestRenderFn?.();
+          ctx.ui.notify("Quota refreshed", "info");
           break;
+        }
         case "set-enabled": {
           config = { ...config, enabled: action.enabled };
           saveConfig(dependencies.configPath, config);
           if (action.enabled) {
-            reloadConfig(); // starts poller + installs footer mid-session (no restart needed)
+            reloadConfig();
             ctx.ui.notify("Statusline enabled", "info");
           } else {
-            // Explicit user disable is the ONE legitimate yield-to-native:
-            // A5's "never yield" rule governs provider switches, not /off.
+            // Explicit user disable is the ONE legitimate yield-to-native (A5 exception).
             ctx.ui.setFooter(undefined);
             footerInstalled = false;
-            stopPoller();
+            for (const a of adapters) a.stop();
+            stopTicker();
             ctx.ui.notify("Statusline disabled — native footer restored", "info");
           }
           break;

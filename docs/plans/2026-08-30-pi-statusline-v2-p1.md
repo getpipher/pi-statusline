@@ -1566,15 +1566,15 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
   }))!;
-  // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → levels round(v/max*6) → ▂▂▃▅▃▂▇.
-  // Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
+  // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → level = max(0, floor(v/max*7)-1)
+  // (Task 1's pinned mapping) → ▁▁▂▄▂▁▇. Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
   assert.deepEqual(frags, [
     { text: "$", color: "dim" },
     { text: " 1.24 sess", color: "muted" },
     { text: " · 8.40 day", color: "muted" },
     { text: " · 31.20 7d", color: "muted" },
     { text: " · 118.75 30d", color: "muted" },
-    { text: " ▂▂▃▅▃▂▇", color: "accent" },
+    { text: " ▁▁▂▄▂▁▇", color: "accent" },
     { text: " · $0.39/hr", color: "muted" },
   ]);
 });

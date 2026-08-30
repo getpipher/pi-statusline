@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { loadConfig, saveConfig, DEFAULT_CONFIG } from "../src/config.ts";
+import { KNOWN_ROW_IDS } from "../src/types.ts";
 
 let tmpDir: string;
 
@@ -21,19 +22,19 @@ test("DEFAULT_CONFIG has expected shape", () => {
   assert.deepEqual(DEFAULT_CONFIG, {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
-    display: { showTokens: true, showContext: true, showGit: true, showSession: true },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true },
   });
 });
 
 test("loadConfig returns defaults when file missing", () => {
-  const cfg = loadConfig(join(tmpDir, "pi-statusline.json"));
-  assert.deepEqual(cfg, DEFAULT_CONFIG);
+  const { config } = loadConfig(join(tmpDir, "pi-statusline.json"));
+  assert.deepEqual(config, DEFAULT_CONFIG);
 });
 
 test("loadConfig returns defaults for literal JSON null", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, "null");
-  assert.deepEqual(loadConfig(path), DEFAULT_CONFIG);
+  assert.deepEqual(loadConfig(path).config, DEFAULT_CONFIG);
 });
 
 test("loadConfig reads a valid file", () => {
@@ -43,7 +44,7 @@ test("loadConfig reads a valid file", () => {
     zai: { tier: "pro", pollIntervalMs: 60_000 },
     display: { showTokens: false, showContext: true, showGit: false, showSession: true },
   }));
-  const cfg = loadConfig(path);
+  const { config: cfg } = loadConfig(path);
   assert.equal(cfg.enabled, false);
   assert.equal(cfg.zai.tier, "pro");
   assert.equal(cfg.zai.pollIntervalMs, 60_000);
@@ -55,7 +56,7 @@ test("loadConfig reads a valid file", () => {
 test("loadConfig merges defaults for missing keys", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({ enabled: false }));
-  const cfg = loadConfig(path);
+  const { config: cfg } = loadConfig(path);
   assert.equal(cfg.enabled, false);
   assert.equal(cfg.zai.tier, "auto");         // defaulted
   assert.equal(cfg.zai.pollIntervalMs, 180_000); // defaulted
@@ -77,6 +78,56 @@ test("saveConfig writes valid JSON readable by loadConfig", () => {
   const parsed = JSON.parse(raw);
   assert.equal(parsed.enabled, false);
   // Round-trip
-  const reloaded = loadConfig(path);
+  const { config: reloaded } = loadConfig(path);
   assert.equal(reloaded.enabled, false);
+});
+
+// ── v2: rows/bars/sparkline + back-compat + unknown-row reporting ──
+
+test("v2: defaults include the full canonical row order and gates on", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({}));
+  const { config, unknownRows } = loadConfig(path);
+  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  assert.equal(config.display.bars, true);
+  assert.equal(config.display.sparkline, true);
+  assert.deepEqual(unknownRows, []);
+});
+
+test("v2: display.rows reorders and omits rows", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({ display: { rows: ["money", "identity"] } }));
+  const { config } = loadConfig(path);
+  assert.deepEqual(config.display.rows, ["money", "identity"]);
+});
+
+test("v2: unknown display.rows ids are dropped and reported, known-unregistered (deen) is not", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({ display: { rows: ["identity", "moneny", "deen", "nope"] } }));
+  const { config, unknownRows } = loadConfig(path);
+  assert.deepEqual(config.display.rows, ["identity", "deen"]);
+  assert.deepEqual(unknownRows, ["moneny", "nope"]);
+});
+
+test("v2: non-string or non-array rows fall back to defaults", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({ display: { rows: "identity", bars: "yes" } }));
+  const { config } = loadConfig(path);
+  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  assert.equal(config.display.bars, true);
+});
+
+test("v1 back-compat: a v1 file (no rows/bars/sparkline) loads cleanly with defaults merged", () => {
+  const path = join(tmpDir, "pi-statusline.json");
+  writeFileSync(path, JSON.stringify({
+    enabled: true,
+    zai: { tier: "pro", pollIntervalMs: 60_000 },
+    display: { showTokens: false, showContext: true, showGit: true },
+  }));
+  const { config, unknownRows } = loadConfig(path);
+  assert.equal(config.zai.tier, "pro");
+  assert.equal(config.zai.pollIntervalMs, 60_000);
+  assert.equal(config.display.showTokens, false);
+  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  assert.deepEqual(unknownRows, []);
 });
