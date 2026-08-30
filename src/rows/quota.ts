@@ -1,6 +1,6 @@
 // src/rows/quota.ts
 import { resolveQuotaAdapter, type ProviderRowAdapter } from "../adapters/types.ts";
-import type { ColorToken, Fragment } from "../types.ts";
+import type { ColorToken, Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
 // Usage heat mirrors the ctx bar's escalation bands: accent <70%, warning ≥70%,
@@ -17,7 +17,7 @@ export function createQuotaRow(adapters: ProviderRowAdapter<any>[]): Row {
   return {
     id: "quota",
     priority: 2,
-    render(snapshot: RowSnapshot): Fragment[] | null {
+    render(snapshot: RowSnapshot, _detail: RowDetail): Fragment[] | null {
       const winner = resolveQuotaAdapter(adapters, snapshot.session.provider);
       const data = winner?.current();
       if (!winner || data === null || data === undefined) return null;

@@ -1,20 +1,26 @@
 // src/rows/ambient.ts
 import { formatClock, formatSpan } from "../format.ts";
+import type { Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
 export function createAmbientRow(): Row {
   return {
     id: "ambient",
     priority: 3,
-    render(snapshot: RowSnapshot): NonNullable<ReturnType<Row["render"]>> {
-      const frags: Array<{ text: string; color: "dim" }> = [
-        { text: formatClock(snapshot.now), color: "dim" },
-        { text: ` | coding ${formatSpan(snapshot.session.spanMs)}`, color: "dim" },
-      ];
-      // v1 good-citizen preservation: other extensions' setStatus text surfaces here.
-      // The 30s ticker re-renders, which re-pulls statuses (fixes v1's refresh gap).
-      if (snapshot.statuses) {
-        frags.push({ text: ` | ${snapshot.statuses}`, color: "dim" });
+    render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null {
+      const frags: Fragment[] = [{ text: formatClock(snapshot.now), color: "dim" }];
+      if (detail >= 1) {
+        frags.push({ text: ` | coding ${formatSpan(snapshot.session.spanMs)}`, color: "dim" });
+        // Hijri date + city moved here from the deen strip (RECTOR) — muted, deen-gated.
+        if (snapshot.deen) {
+          frags.push({ text: ` | ${snapshot.deen.hijri}`, color: "muted" });
+          frags.push({ text: ` | ${snapshot.deen.city}`, color: "muted" });
+        }
+        // v1 good-citizen preservation: other extensions' setStatus text surfaces here.
+        // The 30s ticker re-renders, which re-pulls statuses (fixes v1's refresh gap).
+        if (detail >= 2 && snapshot.statuses) {
+          frags.push({ text: ` | ${snapshot.statuses}`, color: "dim" });
+        }
       }
       return frags;
     },
