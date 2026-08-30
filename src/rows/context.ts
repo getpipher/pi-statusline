@@ -1,13 +1,13 @@
 // src/rows/context.ts
 import { formatTokenCount, splitBar } from "../format.ts";
-import type { ColorToken, Fragment } from "../types.ts";
+import type { ColorToken, Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
 export function createContextRow(): Row {
   return {
     id: "ctx",
     priority: 1,
-    render(snapshot: RowSnapshot): Fragment[] | null {
+    render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null {
       const s = snapshot.session;
       const display = snapshot.config.display;
       const frags: Fragment[] = [{ text: "ctx", color: "dim" }];
@@ -28,21 +28,24 @@ export function createContextRow(): Row {
         const fillColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "accent";
         const { filled, empty } = splitBar(ratio);
         frags.push({ text: ` ${filled}`, color: fillColor });
-        frags.push({ text: empty, color: "dim" });
+        // Empty cells read as an unfilled gauge — muted (RECTOR: dim was low contrast).
+        frags.push({ text: empty, color: "muted" });
       }
       if (showPct) {
         frags.push({ text: ` ${Math.round(ratio * 100)}%`, color: "text" });
-        if (s.contextTokens !== null && s.contextWindow > 0) {
+        if (detail >= 2 && s.contextTokens !== null && s.contextWindow > 0) {
           frags.push({ text: ` ${formatTokenCount(s.contextTokens)}/${formatTokenCount(s.contextWindow)}`, color: "text" });
         }
       }
-      if (display.showTokens) {
+      if (display.showTokens && detail >= 1) {
         frags.push({ text: ` | ↑${formatTokenCount(s.usage.input)} ↓${formatTokenCount(s.usage.output)}`, color: "toolTitle" });
       }
-      const cacheDenominator = s.usage.cacheRead + s.usage.input;
-      if (cacheDenominator > 0) {
-        const hit = Math.round((s.usage.cacheRead / cacheDenominator) * 100);
-        frags.push({ text: ` | cache ${hit}%`, color: "muted" });
+      if (detail >= 2) {
+        const cacheDenominator = s.usage.cacheRead + s.usage.input;
+        if (cacheDenominator > 0) {
+          const hit = Math.round((s.usage.cacheRead / cacheDenominator) * 100);
+          frags.push({ text: ` | cache ${hit}%`, color: "muted" });
+        }
       }
       return frags.length > 1 ? frags : null;
     },

@@ -1,7 +1,7 @@
 // src/rows/deen.ts
 import type { DeenSnapshot } from "../deen/source.ts";
 import type { PrayerScheduleEntry } from "../deen/time.ts";
-import type { ColorToken, Fragment } from "../types.ts";
+import type { ColorToken, Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
 // (Xh Ym) — hours omitted under 1h → (45m); minutes omitted at whole hours → (2h); (0m) at zero.
@@ -49,22 +49,32 @@ export function createDeenRow(): Row {
   return {
     id: "deen",
     priority: 1,
-    render(snapshot: RowSnapshot): Fragment[] | null {
+    render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null {
       const d = snapshot.deen;
       if (!d) return null;
       const esc = d.escalation;
-      const frags: Fragment[] = [{ text: "deen", color: esc === "imminent" ? "accent" : "dim" }];
-      d.schedule.forEach((entry, i) => {
-        // Separator lives INSIDE the name fragment (pinned contract): block 1 opens with
-        // a single space after the label, later blocks with " | ".
-        frags.push({ text: `${i === 0 ? " " : " | "}${entry.name}`, color: nameColor(entry, esc) });
+
+      // Detail 0 — next prayer only: `Dhuhr (2h)` with escalation colors.
+      if (detail === 0) {
+        const next = d.schedule.find((e) => e.state === "next");
+        if (!next) return null;
+        return [
+          { text: next.name, color: nameColor(next, esc) },
+          { text: ` ${countdown(next.minutesUntil)}`, color: esc === "near" || esc === "imminent" ? "accent" : "text" },
+        ];
+      }
+
+      // Detail 2 = full strip; detail 1 drops past prayers. No label (RECTOR): the first
+      // rendered prayer starts the line bare; later blocks carry " | ". Hijri/city live on
+      // the ambient row now.
+      const shown = detail >= 2 ? d.schedule : d.schedule.filter((e) => e.state !== "past");
+      const frags: Fragment[] = [];
+      shown.forEach((entry, i) => {
+        frags.push({ text: `${i === 0 ? "" : " | "}${entry.name}`, color: nameColor(entry, esc) });
         frags.push(...prayerTail(entry, esc));
       });
-      const tailColor: ColorToken = esc === "imminent" ? "accent" : "muted";
-      frags.push({ text: ` | ${d.hijri}`, color: tailColor });
-      frags.push({ text: ` | ${d.city}`, color: tailColor });
       if (d.staleMinutes !== null) frags.push({ text: ` | stale ${d.staleMinutes}m`, color: "warning" });
-      return frags;
+      return frags.length > 0 ? frags : null;
     },
   };
 }

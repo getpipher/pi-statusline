@@ -22,3 +22,7 @@ export type RowId = (typeof KNOWN_ROW_IDS)[number];
 // Retention tiers under width pressure: 1 = kept longest (identity/ctx/deen),
 // 2 = money/quota, 3 = ambient (dropped first).
 export type RowPriority = 1 | 2 | 3;
+
+// Responsive detail levels (CC-style): 2 = full, 1 = compact, 0 = minimal. The
+// registry shrinks rows (phase S) BEFORE dropping (phase D) — detail never re-raises.
+export type RowDetail = 2 | 1 | 0;

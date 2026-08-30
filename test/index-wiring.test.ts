@@ -344,7 +344,8 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
     assert.ok(h.footerHolder.current, "footer installed");
     const lines = h.footerHolder.current.render(500);
     const flat = lines.join("\n");
-    assert.match(flat, /deen .*Fajr .*✓.*Dhuhr.*(2h)/, "deen strip with past ✓ + next countdown");
+    // v2 responsive: the deen label is gone (RECTOR) — the strip starts at the first prayer.
+    assert.match(flat, /Fajr .*✓.*Dhuhr.*(2h)/, "deen strip with past ✓ + next countdown");
     assert.match(flat, /17 Rabīʿ al-awwal 1448/, "hijri flowed via snapshot.deen");
     assert.match(flat, /Jakarta/, "city flowed via snapshot.deen");
 

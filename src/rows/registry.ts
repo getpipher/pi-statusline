@@ -1,6 +1,6 @@
 // src/rows/registry.ts
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { Fragment, RowId, RowPriority } from "../types.ts";
+import type { Fragment, RowDetail, RowId, RowPriority } from "../types.ts";
 import type { StatuslineConfig } from "../config.ts";
 import type { SessionSnapshot } from "../session/store.ts";
 import type { LedgerSnapshot } from "../ledger/store.ts";
@@ -21,8 +21,9 @@ export interface Row {
   id: RowId;
   priority: RowPriority;
   // null → row omitted (source unavailable/failed). Fragments own all spacing/separators;
-  // the renderer joins them with "" and applies theme colors.
-  render(snapshot: RowSnapshot): Fragment[] | null;
+  // the renderer joins them with "" and applies theme colors. `detail` is the responsive
+  // level the registry requests (phase S shrinks widest-first before dropping).
+  render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null;
 }
 
 export interface RowRegistry {
@@ -44,6 +45,7 @@ interface RenderedRow {
   displayIndex: number;
   fragments: Fragment[];
   width: number;
+  detail: RowDetail;
 }
 
 function lineWidth(frags: Fragment[]): number {
@@ -65,16 +67,32 @@ export function renderRows(registry: RowRegistry, order: RowId[], snapshot: RowS
 
   const rendered: RenderedRow[] = [];
   resolved.forEach((row, displayIndex) => {
-    const fragments = row.render(snapshot);
+    const fragments = row.render(snapshot, 2);
     if (fragments && fragments.length > 0) {
-      rendered.push({ row, displayIndex, fragments, width: lineWidth(fragments) });
+      rendered.push({ row, displayIndex, fragments, width: lineWidth(fragments), detail: 2 });
     }
   });
 
   const width = snapshot.width;
   let current = rendered;
 
-  // Phase 1 — whole-row drop (priority > 1 only; identity/ctx are never dropped).
+  // Phase S — progressive detail shrink: while any line overflows, re-render the WIDEST
+  // overflowing row with detail > 0 one level down (tie → later display order). Each row
+  // can shrink at most twice per render, so the phase terminates; detail never re-raises.
+  for (;;) {
+    const candidates = current.filter((r) => r.width > width && r.detail > 0);
+    if (candidates.length === 0) break;
+    const target = candidates
+      .sort((a, b) => b.width - a.width || b.displayIndex - a.displayIndex)[0]!;
+    target.detail = (target.detail - 1) as RowDetail;
+    const next = target.row.render(snapshot, target.detail);
+    if (next && next.length > 0) {
+      target.fragments = next;
+      target.width = lineWidth(next);
+    }
+  }
+
+  // Phase D — whole-row drop (priority > 1 only; identity/ctx are never dropped).
   let droppable = dropOrder(current.filter((r) => r.row.priority > 1));
   while (droppable.length > 0 && current.some((r) => r.width > width)) {
     const worst = droppable.shift()!;

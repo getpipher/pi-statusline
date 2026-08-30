@@ -108,10 +108,10 @@ test("quota row: renders the adapter line; dimmed when active provider ≠ adapt
     fetch: async () => QUOTA, render: (d, dim) => renderZaiQuota(d, NOW) + (dim ? "!" : ""), start() {}, stop() {},
   };
   const row = createQuotaRow([zai]);
-  const active = row.render(snap({}))!;
+  const active = row.render(snap({}), 2)!;
   // No heat() on this adapter → neutral muted.
   assert.deepEqual(active, [{ text: renderZaiQuota(QUOTA, NOW), color: "muted" }]);
-  const inactive = row.render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider: "anthropic" } }))!;
+  const inactive = row.render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider: "anthropic" } }), 2)!;
   assert.deepEqual(inactive, [{ text: `${renderZaiQuota(QUOTA, NOW)}!`, color: "dim" }]);
 });
 
@@ -122,7 +122,7 @@ test("quota row: heat tints the line — accent <70, warning ≥70, error ≥90;
   });
   const row = createQuotaRow([]);
   const render = (percentage: number, provider = "zai") =>
-    createQuotaRow([mk(percentage)]).render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider } }))!;
+    createQuotaRow([mk(percentage)]).render(snap({ session: { ...(snap({}).session as SessionSnapshot), provider } }), 2)!;
   assert.deepEqual(render(69), [{ text: "zai-line", color: "accent" }]);
   assert.deepEqual(render(70), [{ text: "zai-line", color: "warning" }]);
   assert.deepEqual(render(90), [{ text: "zai-line", color: "error" }]);
@@ -135,8 +135,8 @@ test("quota row: null/NaN heat falls back to neutral muted", () => {
     id: "zai", matches: (p) => p === "zai", current: () => QUOTA,
     fetch: async () => null, render: () => "zai-line", heat, start() {}, stop() {},
   });
-  assert.deepEqual(createQuotaRow([mk(() => null)]).render(snap({})), [{ text: "zai-line", color: "muted" }]);
-  assert.deepEqual(createQuotaRow([mk(() => Number.NaN)]).render(snap({})), [{ text: "zai-line", color: "muted" }]);
+  assert.deepEqual(createQuotaRow([mk(() => null)]).render(snap({}), 2), [{ text: "zai-line", color: "muted" }]);
+  assert.deepEqual(createQuotaRow([mk(() => Number.NaN)]).render(snap({}), 2), [{ text: "zai-line", color: "muted" }]);
 });
 
 test("quota row: null when no adapter has data", () => {
@@ -144,5 +144,5 @@ test("quota row: null when no adapter has data", () => {
     id: "zai", matches: (p) => p === "zai", current: () => null,
     fetch: async () => null, render: () => "zai", start() {}, stop() {},
   };
-  assert.equal(createQuotaRow([zai]).render(snap({})), null);
+  assert.equal(createQuotaRow([zai]).render(snap({}), 2), null);
 });
