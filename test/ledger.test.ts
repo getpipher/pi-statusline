@@ -1,7 +1,7 @@
 // test/ledger.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLedgerStore, localDayIndex } from "../src/ledger/store.ts";
@@ -116,5 +116,45 @@ test("reconcile creates the ledger directory when missing", () => {
   store.load();
   store.reconcile([entry("a1", "2026-08-30T09:00:00.000Z", 0.5)]);
   assert.ok(existsSync(filePath));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("reconcile never throws on persist failure — fail-open, counts persisted only, warns once (spec §10)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-blocked-"));
+  const blockingDir = join(dir, "blocking-dir"); // filePath IS a directory → appendFileSync throws EISDIR
+  mkdirSync(blockingDir);
+  const warnings: string[] = [];
+  const store = createLedgerStore({ filePath: blockingDir, utcOffsetMinutes: SGT, warn: (m) => warnings.push(m) });
+  store.load();
+  const entries = [
+    entry("b1", "2026-08-30T09:00:00.000Z", 0.5),
+    entry("b2", "2026-08-30T09:01:00.000Z", 0.25),
+  ];
+  assert.equal(store.reconcile(entries), 0, "returns persisted count — 0 when the disk write fails");
+  assert.doesNotThrow(() => store.reconcile(entries), "render-path call must never throw (spec §10)");
+  assert.ok(warnings.length >= 1, "a cause-bearing warning fired");
+  const appendWarn = warnings.find((w) => /ledger append failed for entry b1/.test(w));
+  assert.ok(appendWarn, "the append-failure warning carries the entry id + cause");
+  assert.match(appendWarn, /EISDIR/, "cause-bearing (the underlying error message)");
+  // Fail-open + seen-marked: the in-memory snapshot still reflects the entries (no double count on retry).
+  const snap = store.getSnapshot();
+  assert.equal(snap.todayCost, 0.75, "in-memory totals stay consistent (disk lost, memory kept)");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("NaN cost entries are recorded as 0 (guard against JSON null round-trip re-append)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-nan-"));
+  const filePath = join(dir, "ledger.jsonl");
+  const store = createLedgerStore({ filePath, utcOffsetMinutes: SGT });
+  store.load();
+  const nanEntry = {
+    type: "message",
+    id: "nan1",
+    timestamp: "2026-08-30T09:00:00.000Z",
+    message: { role: "assistant", usage: { input: 1, output: 1, cost: { total: Number.NaN } } },
+  };
+  assert.equal(store.reconcile([nanEntry as never]), 1);
+  const raw = JSON.parse(readFileSync(filePath, "utf8").trim().split("\n")[0]!);
+  assert.equal(raw.cost, 0, "NaN cost persisted as 0 — reload parses it, no per-restart re-append");
   rmSync(dir, { recursive: true, force: true });
 });

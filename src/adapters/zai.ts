@@ -1,5 +1,5 @@
 // src/adapters/zai.ts
-import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaLimit, type QuotaResult } from "../quota/zai.ts";
+import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaResult } from "../quota/zai.ts";
 import { formatTokenCount, formatReset, renderBar } from "../format.ts";
 import type { ProviderRowAdapter } from "./types.ts";
 

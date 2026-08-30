@@ -100,9 +100,6 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
   };
 }
 
-function plain(frags: ReturnType<ReturnType<typeof createQuotaRow>["render"]>): string {
-  return (frags ?? []).map((f) => f.text).join("");
-}
 
 test("quota row: renders the adapter line; dimmed when active provider ≠ adapter", () => {
   const zai: ProviderRowAdapter<QuotaResult> = {

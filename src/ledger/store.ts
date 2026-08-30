@@ -71,10 +71,20 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
   const lines: LedgerLine[] = [];
   let loaded = false;
   let warned = false;
+  let warnedAppend = false;
 
   const warnOnce = (message: string): void => {
     if (warned) return;
     warned = true;
+    if (opts.warn) opts.warn(message);
+    else console.error(`pi-statusline ledger: ${message}`);
+  };
+
+  // Append failures carry their own once-flag: a scan warning must not swallow the
+  // persist warning (different causes — the render path needs the append cause).
+  const warnOnceAppend = (message: string): void => {
+    if (warnedAppend) return;
+    warnedAppend = true;
     if (opts.warn) opts.warn(message);
     else console.error(`pi-statusline ledger: ${message}`);
   };
@@ -90,14 +100,15 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
     return {
       id: entry.id,
       ts,
-      provider: "unknown", // enriched by callers? No — kept minimal; provider/model land via opts below.
+      // P1 records "unknown" for both — pi usage entries carry no per-entry attribution.
+      provider: "unknown",
       model: "unknown",
       input: u.input ?? 0,
       output: u.output ?? 0,
       cacheRead: u.cacheRead ?? 0,
       cacheWrite: u.cacheWrite ?? 0,
       reasoning: u.reasoning ?? 0,
-      cost: u.cost?.total ?? 0,
+      cost: u.cost?.total !== undefined && Number.isFinite(u.cost.total) ? u.cost.total : 0,
     };
   }
 
@@ -132,9 +143,16 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
         if (!lineItem || seen.has(lineItem.id)) continue;
         seen.add(lineItem.id);
         lines.push(lineItem);
-        mkdirSync(dirname(opts.filePath), { recursive: true });
-        appendFileSync(opts.filePath, `${JSON.stringify(lineItem)}\n`, "utf8");
-        appended += 1;
+        try {
+          mkdirSync(dirname(opts.filePath), { recursive: true });
+          appendFileSync(opts.filePath, `${JSON.stringify(lineItem)}\n`, "utf8");
+          appended += 1;
+        } catch (err) {
+          // Spec §10: reconcile runs inside the footer render — a persist failure must
+          // never throw there. Fail-open: the id stays seen (no double count on retry),
+          // the disk line is lost, and warnOnce carries the cause.
+          warnOnceAppend(`ledger append failed for entry ${lineItem.id}: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
       return appended;
     },

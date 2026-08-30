@@ -199,8 +199,7 @@ export function activateStatusline(
           ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max>", "info");
           break;
         case "refresh": {
-          const withData = adapters.filter((a) => a.current() !== null || a.matches(ctx.model?.provider));
-          if (withData.length === 0 && adapters.length === 0) {
+          if (adapters.length === 0) {
             ctx.ui.notify("No provider adapters configured", "warning");
             break;
           }
