@@ -9,6 +9,12 @@ export interface StatuslineConfig {
     tier: "auto" | "lite" | "pro" | "max";
     pollIntervalMs: number;
   };
+  deen: {
+    city: string;            // "auto" → IP-geo resolution
+    country: string;
+    method: string;          // "auto" → aladhan default
+    escalateMinutes: number;
+  };
   display: {
     rows: RowId[];          // display order; subset/reorder of the registry, never invents
     bars: boolean;
@@ -28,6 +34,7 @@ export interface ConfigLoadResult {
 export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
+  deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
   display: {
     rows: [...KNOWN_ROW_IDS],
     bars: true,
@@ -75,6 +82,14 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof z.pollIntervalMs === "number" && z.pollIntervalMs > 0) {
       cfg.zai.pollIntervalMs = z.pollIntervalMs;
     }
+  }
+
+  if (parsed.deen && typeof parsed.deen === "object") {
+    const d = parsed.deen as Record<string, unknown>;
+    if (typeof d.city === "string") cfg.deen.city = d.city;
+    if (typeof d.country === "string") cfg.deen.country = d.country;
+    if (typeof d.method === "string") cfg.deen.method = d.method;
+    if (typeof d.escalateMinutes === "number" && d.escalateMinutes > 0) cfg.deen.escalateMinutes = d.escalateMinutes;
   }
 
   if (parsed.display && typeof parsed.display === "object") {

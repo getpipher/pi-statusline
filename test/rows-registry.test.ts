@@ -32,6 +32,7 @@ function makeSnapshot(width: number): RowSnapshot {
     ledger: null as never,
     statuses: "",
     config: null as never,
+    deen: null,
     order: [...ORDER],
   };
 }

@@ -4,6 +4,7 @@ import type { Fragment, RowId, RowPriority } from "../types.ts";
 import type { StatuslineConfig } from "../config.ts";
 import type { SessionSnapshot } from "../session/store.ts";
 import type { LedgerSnapshot } from "../ledger/store.ts";
+import type { DeenSnapshot } from "../deen/source.ts";
 
 export interface RowSnapshot {
   now: number;
@@ -12,6 +13,7 @@ export interface RowSnapshot {
   ledger: LedgerSnapshot;
   statuses: string;
   config: StatuslineConfig;
+  deen: DeenSnapshot | null; // P2 — null until DeenSource provides data (row omitted)
   order?: RowId[]; // optional echo of the display order (unused by rows; kept for debugging)
 }
 

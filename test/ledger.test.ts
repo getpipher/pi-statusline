@@ -1,7 +1,7 @@
 // test/ledger.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, existsSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createLedgerStore, localDayIndex } from "../src/ledger/store.ts";
@@ -44,7 +44,7 @@ test("reconcile appends unseen usage entries once and is idempotent", () => {
   assert.equal(store.reconcile(entries), 0); // second pass: all seen — double-count impossible
   const raw = readFileSync(filePath, "utf8").trim().split("\n");
   assert.equal(raw.length, 2);
-  assert.deepEqual(JSON.parse(raw[0]!), { id: "a1", provider: "unknown", model: "unknown", cost: 0.5, ts: Date.parse("2026-08-30T09:00:00.000Z"), input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
+  assert.deepEqual(JSON.parse(raw[0]!), { id: "a1", provider: "unknown", model: "unknown", repo: "unknown", cost: 0.5, ts: Date.parse("2026-08-30T09:00:00.000Z"), input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -156,5 +156,35 @@ test("NaN cost entries are recorded as 0 (guard against JSON null round-trip re-
   assert.equal(store.reconcile([nanEntry as never]), 1);
   const raw = JSON.parse(readFileSync(filePath, "utf8").trim().split("\n")[0]!);
   assert.equal(raw.cost, 0, "NaN cost persisted as 0 — reload parses it, no per-restart re-append");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("repo attribution: lines record cwd basename; repoCost sums only the current repo", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-"));
+  const filePath = join(dir, "ledger.jsonl");
+  const now = Date.UTC(2026, 7, 30, 10, 0);
+  // `store` is re-created mid-test to re-scan the file after direct writes.
+  let store = createLedgerStore({
+    filePath, now: () => now, utcOffsetMinutes: SGT,
+    repo: () => "pi-statusline",
+  });
+  store.load();
+  const other = JSON.stringify({ id: "x1", ts: now, provider: "unknown", model: "unknown", repo: "other-repo", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0, cost: 5 });
+  writeFileSync(filePath, `${other}\n`);
+  store = createLedgerStore({ filePath, now: () => now, utcOffsetMinutes: SGT, repo: () => "pi-statusline" });
+  store.load();
+  store.reconcile([entry("a1", "2026-08-30T09:00:00.000Z", 1.24)]);
+  const snap = store.getSnapshot();
+  assert.deepEqual(snap.repoCost, 1.24); // other-repo's 5.00 excluded
+  const raw = readFileSync(filePath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.equal(raw[1]!.repo, "pi-statusline");
+  // Lines WITHOUT repo (pre-P2) default to "unknown" and never count toward repoCost.
+  // (Appended — the brief's draft wrote the file wholesale, clobbering the prior lines
+  // and making this assertion vacuously 0.)
+  const legacy = JSON.stringify({ id: "x2", ts: now, provider: "unknown", model: "unknown", input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0, cost: 2 });
+  appendFileSync(filePath, `${legacy}\n`);
+  const store2 = createLedgerStore({ filePath, now: () => now, utcOffsetMinutes: SGT, repo: () => "pi-statusline" });
+  store2.load();
+  assert.deepEqual(store2.getSnapshot().repoCost, 1.24);
   rmSync(dir, { recursive: true, force: true });
 });

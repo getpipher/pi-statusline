@@ -1,5 +1,5 @@
 // src/index.ts
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -15,29 +15,36 @@ import { createContextRow } from "./rows/context.ts";
 import { createMoneyRow } from "./rows/money.ts";
 import { createQuotaRow } from "./rows/quota.ts";
 import { createAmbientRow } from "./rows/ambient.ts";
+import { createDeenRow } from "./rows/deen.ts";
+import { createDeenSource, type DeenSource } from "./deen/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-statusline.json");
 const LEDGER_PATH = join(homedir(), ".pi", "agent", "pi-statusline", "ledger.jsonl");
+const DEEN_CACHE_PATH = join(homedir(), ".pi", "agent", "pi-statusline", "deen-cache.json");
 
 export interface StatuslineRuntimeDependencies {
   authJsonPath: string;
   configPath: string;
   ledgerPath: string;
+  deenCachePath: string;
   readKey: typeof readZaiKey;
   makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
+  makeDeenSource: (deps: { cachePath: string; config: () => StatuslineConfig }) => DeenSource;
 }
 
 const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
   authJsonPath: AUTH_JSON,
   configPath: CONFIG_PATH,
   ledgerPath: LEDGER_PATH,
+  deenCachePath: DEEN_CACHE_PATH,
   readKey: readZaiKey,
   makeAdapters: ({ authJsonPath, readKey, config, onRefresh }) => [
     createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
   ],
+  makeDeenSource: ({ cachePath, config }) => createDeenSource({ cachePath, config: () => config().deen }),
 };
 
 export function activateStatusline(
@@ -59,6 +66,28 @@ export function activateStatusline(
   let requestRenderFn: (() => void) | null = null;
   let footerInstalled = false;
 
+  // DeenSource lives for the whole activateStatusline lifetime — ONE source, never
+  // recreated on session reinstall (its in-memory last-good state must survive).
+  const deenSource = dependencies.makeDeenSource({
+    cachePath: dependencies.deenCachePath,
+    config: () => config,
+  });
+  let lastDeenRefresh = 0;
+  // Cheap throttle: the 30s ticker must not hammer the API (refresh is cache-first,
+  // but a no-op call is still a disk read + freshness check).
+  const deenNeedsRefresh = (): boolean => Date.now() - lastDeenRefresh > 60_000;
+  const refreshDeen = (force = false): void => {
+    void deenSource.refresh(force)
+      .then(() => {
+        lastDeenRefresh = Date.now();
+        // Repaint on completion (cold-cache first paint): without this the deen row
+        // stays absent until the 30s tick — mirrors the zai adapter's onRefresh pattern.
+        // Safe no-op while the footer is uninstalled (requestRenderFn null).
+        requestRenderFn?.();
+      })
+      .catch(() => { /* fire-and-forget: deen failures degrade to null/stale, never throw */ });
+  };
+
   function buildAdapters(): void {
     for (const a of adapters) a.stop();
     adapters = dependencies.makeAdapters({
@@ -72,6 +101,7 @@ export function activateStatusline(
       createContextRow(),
       createMoneyRow(),
       createQuotaRow(adapters),
+      createDeenRow(),
       createAmbientRow(),
     ]);
     if (config.enabled) for (const a of adapters) a.start();
@@ -79,7 +109,10 @@ export function activateStatusline(
 
   function ensureLedger(): LedgerStore {
     if (!ledgerStore) {
-      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath });
+      // Task-6 wiring tail: attribute lines with the current repo so the REPO all-time
+      // total renders. pi launches in the project dir — basename(cwd) matches
+      // SessionStore's repoName default (identity-row consistency).
+      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath, repo: () => basename(process.cwd()) });
       ledgerStore.load();
     }
     return ledgerStore;
@@ -93,6 +126,7 @@ export function activateStatusline(
         if (sessionCtx) {
           ensureLedger().reconcile(sessionCtx.sessionManager.getEntries());
         }
+        if (deenNeedsRefresh()) refreshDeen();
         requestRenderFn?.();
       },
     });
@@ -145,6 +179,7 @@ export function activateStatusline(
             ledger: ledger.getSnapshot(),
             statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
+            deen: deenSource.current(),
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           // One theme pass: fragment colors → theme.fg; fragments own all spacing.
@@ -182,6 +217,7 @@ export function activateStatusline(
       installFooter(ctx);
       drainRowWarnings();
       startTicker();
+      refreshDeen(); // async, off the render path — print-mode safe (no new timers)
     }
   });
 
@@ -191,12 +227,12 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max>)",
+    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
         case "open-panel":
-          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max>", "info");
+          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>", "info");
           break;
         case "refresh": {
           if (adapters.length === 0) {
@@ -228,6 +264,16 @@ export function activateStatusline(
           config = { ...config, zai: { ...config.zai, tier: action.tier } };
           saveConfig(dependencies.configPath, config);
           ctx.ui.notify(`Tier override set to ${action.tier} (auto = use data.level from the API)`, "info");
+          break;
+        }
+        case "set-deen-city": {
+          config = { ...config, deen: { ...config.deen, city: action.city } };
+          saveConfig(dependencies.configPath, config);
+          try {
+            await deenSource.refresh(true); // force: new city may need a fresh geo+timetable
+          } catch { /* refresh never throws per contract; belt-and-braces for injected fakes */ }
+          ctx.ui.notify(`Deen location set to ${action.city}`, "info");
+          requestRenderFn?.();
           break;
         }
         case "error":
