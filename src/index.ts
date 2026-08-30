@@ -1,5 +1,5 @@
 // src/index.ts
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -103,7 +103,10 @@ export function activateStatusline(
 
   function ensureLedger(): LedgerStore {
     if (!ledgerStore) {
-      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath });
+      // Task-6 wiring tail: attribute lines with the current repo so the REPO all-time
+      // total renders. pi launches in the project dir — basename(cwd) matches
+      // SessionStore's repoName default (identity-row consistency).
+      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath, repo: () => basename(process.cwd()) });
       ledgerStore.load();
     }
     return ledgerStore;
@@ -223,7 +226,7 @@ export function activateStatusline(
       const action = parseStatuslineArgs(args);
       switch (action.action) {
         case "open-panel":
-          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max>", "info");
+          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>", "info");
           break;
         case "refresh": {
           if (adapters.length === 0) {

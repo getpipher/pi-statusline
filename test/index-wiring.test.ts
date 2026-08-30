@@ -347,11 +347,12 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
     h.handlers.get("session_start")?.({}, h.ctx);
     assert.ok(deenRefreshes > before, "second session_start refreshes the deen source again");
 
-    // P2-19: default wiring passes no repo accessor → repoCost 0 → money row starts
-    // with the bare "$X.XX sess" lead (no REPO, no orphan " | " separator).
+    // Fix wave (review): the ledger repo accessor is wired (basename(cwd) — "pi-statusline"
+    // under the test runner), so both harness entries attribute to it → repoCost 1.00
+    // (0.25 + 0.75) and the money row leads with the all-time REPO total.
     const moneyLine = lines.find((l) => l.includes(" sess"));
     assert.ok(moneyLine, "money line present");
-    assert.ok(!moneyLine.includes("REPO"), "no REPO lead when repoCost is 0");
+    assert.match(moneyLine, /REPO \$1\.00/, "REPO all-time total renders end-to-end (repo accessor wired)");
     assert.ok(!/^\s*\|/.test(moneyLine), "no orphan leading separator");
 
     // (3) /statusline deen Mecca → persisted + notified + forced refresh.
