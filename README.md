@@ -74,10 +74,13 @@ Spend is accumulated in `~/.pi/agent/pi-statusline/ledger.jsonl` — an
 append-only JSONL file keyed by session-entry id (restart-safe; the same entry
 is never counted twice). Since v0.3.0 each line records the **repo** it was
 spent in (the cwd basename at write time), and the money line leads with
-`REPO $X` — the all-time total for the current repo. Pre-v0.3.0 lines (no
-`repo` field, `"unknown"`) never count toward the REPO total; per-repo history
-is simply not reconstructible for them. `$` is folded into each money value
-(`$1.24 sess`), CC-style. It is safe to delete at any time: the footer rebuilds
+`REPO $X` — the all-time total for the current repo (once the repo has
+recorded any spend; a fresh ledger renders without the lead). Pre-v0.3.0
+lines (no `repo` field, `"unknown"`) never count toward the REPO total;
+per-repo history is simply not reconstructible for them. `$` is folded into
+each money value (`$1.24 sess`), CC-style; with fewer than two usage entries
+there is no burn rate yet and the row ends ` | —` instead. It is safe to
+delete at any time: the footer rebuilds
 from an empty ledger and **historical sessions are not re-scanned** — day/7d/
 30d totals simply start over from the next session.
 

@@ -335,6 +335,12 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
     // (1) session_start → deen source refreshed + the strip renders with hijri + city.
     h.handlers.get("session_start")?.({}, h.ctx);
     assert.ok(deenRefreshes >= 1, "session_start refreshes the deen source");
+    // Refresh completion must trigger a re-render (cold-cache first paint): without it
+    // the deen row stays absent until the 30s ticker. session_start itself requests
+    // no render, so any increase here comes from refreshDeen's .then.
+    const renderBefore = h.renderRequests();
+    await new Promise((r) => setImmediate(r)); // let the async refresh + .then settle
+    assert.ok(h.renderRequests() > renderBefore, "deen refresh completion requests a re-render");
     assert.ok(h.footerHolder.current, "footer installed");
     const lines = h.footerHolder.current.render(500);
     const flat = lines.join("\n");

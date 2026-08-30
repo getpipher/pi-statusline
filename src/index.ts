@@ -78,7 +78,13 @@ export function activateStatusline(
   const deenNeedsRefresh = (): boolean => Date.now() - lastDeenRefresh > 60_000;
   const refreshDeen = (force = false): void => {
     void deenSource.refresh(force)
-      .then(() => { lastDeenRefresh = Date.now(); })
+      .then(() => {
+        lastDeenRefresh = Date.now();
+        // Repaint on completion (cold-cache first paint): without this the deen row
+        // stays absent until the 30s tick — mirrors the zai adapter's onRefresh pattern.
+        // Safe no-op while the footer is uninstalled (requestRenderFn null).
+        requestRenderFn?.();
+      })
       .catch(() => { /* fire-and-forget: deen failures degrade to null/stale, never throw */ });
   };
 
