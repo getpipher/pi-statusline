@@ -81,7 +81,7 @@ test("deen row: countdown format — (45m) under an hour, (2h) whole hours", () 
 test("deen row: escalation colors — soon brightens names, near accents countdown+next name, imminent all accent", () => {
   const row = createDeenRow();
   const soon = row.render(snap({ deen: deen({ escalation: "soon" }) }), 2)!;
-  assert.equal(soon[1]!.color, "text"); // Fajr name brightened from dim
+  assert.equal(soon[0]!.color, "text"); // Fajr name brightened from dim
   const near = row.render(snap({ deen: deen({ escalation: "near" }) }), 2)!;
   const nearText = near.find((f) => f.text === " (2h)")!;
   assert.equal(nearText.color, "accent");

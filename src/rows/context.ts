@@ -23,7 +23,7 @@ export function createContextRow(): Row {
       const showPct = display.showContext && ratio !== null;
       if (display.bars && ratio !== null && (showPct || s.contextTokens !== null)) {
         // Two-tone bar: filled cells carry the escalation color (accent, warning ≥70%,
-        // error ≥90%); empty cells stay dim so usage reads as a filled gauge.
+        // error ≥90%); empty cells stay muted so usage reads as a filled gauge.
         const pct = ratio * 100;
         const fillColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "accent";
         const { filled, empty } = splitBar(ratio);
