@@ -55,7 +55,7 @@ test("update+getSnapshot exposes identity, usage, context and span", () => {
   store.update(makeCtx(), "main");
   const snap = store.getSnapshot();
   assert.equal(snap.sessionName, "v2-p1");
-  assert.equal(snap.repoName, "pi-statusline");
+  assert.equal(snap.repoName, ".../getpipher/pi-statusline", "display name = …/parent/basename (v0.4.7, FB7)");
   assert.equal(snap.branch, "main");
   assert.equal(snap.modelId, "glm-5.2");
   assert.equal(snap.provider, "zai");
@@ -89,6 +89,17 @@ test("thinkingLevel defaults to \"off\" when the runtime omits the property", ()
   delete (ctx as Record<string, unknown>).thinkingLevel;
   store.update(ctx, null);
   assert.equal(store.getSnapshot().thinkingLevel, "off");
+});
+
+test("repoName display: shallow cwd renders without dots; ledger key stays basename", () => {
+  const store = createSessionStore({ now: () => NOW, cwd: () => "/proj" });
+  store.update(makeCtx(), null);
+  assert.equal(store.getSnapshot().repoName, "proj", "single component → bare name, no ellipsis");
+  const two = createSessionStore({ now: () => NOW, cwd: () => "/home/r/work" });
+  two.update(makeCtx(), null);
+  assert.equal(two.getSnapshot().repoName, ".../r/work");
+  // Ledger attribution is NOT repoName — index.ts attributes by basename(process.cwd()),
+  // unchanged, so historical ledger lines keep matching.
 });
 
 test("span falls back to store creation time when there are no entries", () => {

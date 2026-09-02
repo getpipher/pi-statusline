@@ -1,5 +1,4 @@
 // src/session/store.ts
-import { basename } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 // Minimal structural view of pi session entries (ground truth: SessionEntryBase has
@@ -77,6 +76,15 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
   let snapshot: SessionSnapshot | null = null;
   const createdAt = now();
 
+  // Display name (v0.4.7, FB7): `…/parent/basename` — three dots + ONE parent dir so the
+  // row shows where inside the org the repo lives. DISPLAY ONLY: ledger attribution stays
+  // basename(cwd) (index.ts) so historical lines keep matching.
+  function repoDisplayName(): string {
+    const parts = cwd().split("/").filter(Boolean);
+    if (parts.length >= 2) return `.../${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+    return parts[0] ?? "/";
+  }
+
   return {
     update(ctx: ExtensionContext, branch: string | null): void {
       // getEntries() (ALL entries) is pi's complete accessor — the native footer uses it
@@ -91,7 +99,7 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
       const spanStart = firstTs ?? createdAt;
       snapshot = {
         sessionName,
-        repoName: basename(cwd()),
+        repoName: repoDisplayName(),
         branch,
         modelId: ctx.model?.id,
         provider: ctx.model?.provider,
@@ -111,7 +119,7 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
       return (
         snapshot ?? {
           sessionName: undefined,
-          repoName: basename(cwd()),
+          repoName: repoDisplayName(),
           branch: null,
           modelId: undefined,
           provider: undefined,
