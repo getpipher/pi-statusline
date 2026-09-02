@@ -21,6 +21,7 @@ import { createDeenSource, type DeenSource } from "./deen/source.ts";
 import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
+import { applyThemeColor, THEME_PRESETS } from "./theme.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -86,6 +87,9 @@ export function activateStatusline(
   let ticker: Ticker | null = null;
   let requestRenderFn: (() => void) | null = null;
   let footerInstalled = false;
+  // Parallel to pendingRowWarnings/notifiedRowWarnings: theme validity is checked at
+  // use (per render) but the unknown-theme notify fires at most once per activation.
+  let notifiedThemeWarning = false;
 
   // DeenSource lives for the whole activateStatusline lifetime — ONE source, never
   // recreated on session reinstall (its in-memory last-good state must survive).
@@ -226,8 +230,16 @@ export function activateStatusline(
             versions: dependencies.readVersions(),
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
-          // One theme pass: fragment colors → theme.fg; fragments own all spacing.
-          return lines.map((frags) => frags.map((f) => theme.fg(f.color, f.text)).join(""));
+          // Theme validation at use (mirrors unknown-row handling): one-time notify.
+          const themeName = config.display.theme;
+          if (!(themeName in THEME_PRESETS) && !notifiedThemeWarning) {
+            notifiedThemeWarning = true;
+            sessionCtx?.ui.notify(`pi-statusline: unknown display.theme "${themeName}" — using default (valid: ${Object.keys(THEME_PRESETS).join(", ")})`, "warning");
+          }
+          // One theme pass: fragment colors → preset remap → theme.fg; fragments own all spacing.
+          return lines.map((frags) =>
+            frags.map((f) => theme.fg(applyThemeColor(f.color, themeName).color, f.text)).join("")
+          );
         },
       };
     });

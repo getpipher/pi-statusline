@@ -527,3 +527,62 @@ test("v2 P3 wiring: makeAdapters deps include a resolving ledger getter", async 
     rmSync(h.tmp, { recursive: true, force: true });
   }
 });
+
+// ── v2 P3 wiring: named theme presets — remap through theme.fg + one-time unknown notify ──
+
+test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", async () => {
+  // (a) mono: no success/toolTitle color names reach theme.fg; content unchanged
+  {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.configPath, JSON.stringify({ display: { theme: "mono" } }));
+      activateStatusline(h.pi, {
+        authJsonPath: join(h.tmp, "auth.json"),
+        configPath: h.configPath,
+        ledgerPath: join(h.tmp, "ledger.jsonl"),
+        readKey: () => "fixture-key",
+        makeGitSource: () => h.fakeGitSource,
+        makeAdapters: () => [h.fakeZaiAdapter],
+      });
+      h.handlers.get("session_start")?.({}, h.ctx);
+      h.colors.length = 0;
+      const flat = h.footerHolder.current!.render(500).join("\n");
+      const colorNames = new Set(h.colors.map((c) => c.color));
+      assert.ok(!colorNames.has("success"), `mono must flatten success, saw: ${[...colorNames]}`);
+      assert.ok(!colorNames.has("toolTitle"), `mono must flatten toolTitle, saw: ${[...colorNames]}`);
+      assert.ok(colorNames.has("text"), "flattened tokens land on text");
+      assert.match(flat, /⎇ main/, "content unchanged — only token remap");
+      assert.equal(h.notifications.filter((n) => n.message.includes("display.theme")).length, 0, "mono is known — no notify");
+    } finally {
+      h.footerHolder.current?.dispose();
+      rmSync(h.tmp, { recursive: true, force: true });
+    }
+  }
+  // (b) unknown theme: identity mapping + exactly ONE warning across two renders
+  {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.configPath, JSON.stringify({ display: { theme: "nope" } }));
+      activateStatusline(h.pi, {
+        authJsonPath: join(h.tmp, "auth.json"),
+        configPath: h.configPath,
+        ledgerPath: join(h.tmp, "ledger.jsonl"),
+        readKey: () => "fixture-key",
+        makeGitSource: () => h.fakeGitSource,
+        makeAdapters: () => [h.fakeZaiAdapter],
+      });
+      h.handlers.get("session_start")?.({}, h.ctx);
+      h.colors.length = 0;
+      h.footerHolder.current!.render(500);
+      h.footerHolder.current!.render(500);
+      const warns = h.notifications.filter((n) => n.message.includes('unknown display.theme "nope"'));
+      assert.equal(warns.length, 1, "exactly one unknown-theme notify across two renders");
+      assert.ok(warns[0] && warns[0].level === "warning", "notify level is warning");
+      // identity fallback: hue tokens still reach theme.fg unchanged
+      assert.ok(new Set(h.colors.map((c) => c.color)).has("toolTitle"), "unknown theme → default identity mapping");
+    } finally {
+      h.footerHolder.current?.dispose();
+      rmSync(h.tmp, { recursive: true, force: true });
+    }
+  }
+});

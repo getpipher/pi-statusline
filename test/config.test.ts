@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false, theme: "default" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
@@ -193,4 +193,21 @@ test("providers.openrouter: defaults enabled/600s; lenient parses (deen block pr
   const bad = loadConfig(badPath).config.providers.openrouter;
   assert.equal(bad.enabled, true);
   assert.equal(bad.pollIntervalMs, 600_000);
+});
+
+test("display.theme: defaults \"default\", lenient string passthrough (validated at use)", () => {
+  const defPath = join(tmpDir, "theme-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.theme, "default");
+  const monoPath = join(tmpDir, "theme-mono.json");
+  writeFileSync(monoPath, JSON.stringify({ display: { theme: "mono" } }));
+  assert.equal(loadConfig(monoPath).config.display.theme, "mono");
+  // stored verbatim even when unknown — validation happens at use (unknown-row precedent)
+  const oddPath = join(tmpDir, "theme-odd.json");
+  writeFileSync(oddPath, JSON.stringify({ display: { theme: "nope" } }));
+  assert.equal(loadConfig(oddPath).config.display.theme, "nope");
+  // non-string ignored, default retained
+  const badPath = join(tmpDir, "theme-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { theme: 5 } }));
+  assert.equal(loadConfig(badPath).config.display.theme, "default");
 });
