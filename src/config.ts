@@ -29,7 +29,9 @@ export interface StatuslineConfig {
     showGit: boolean;
     showSession: boolean;
     showVersions: boolean; // ambient SL/PI stamps (spec §15), default off
-    theme: string; // named preset (default/mono) — validated at use, unknown-row precedent
+    theme: string; // named preset — validated at use, unknown-row precedent
+    glyphs: "nerd" | "unicode" | "ascii"; // segment decoration style (visual upgrade)
+    barStyle: "blocks" | "rounded" | "dots" | "shaded"; // progress bar character style
   };
 }
 
@@ -52,6 +54,8 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
     showSession: true,
     showVersions: false,
     theme: "default",
+    glyphs: "unicode",
+    barStyle: "blocks",
   },
 };
 
@@ -119,6 +123,8 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.bars === "boolean") cfg.display.bars = d.bars;
     if (typeof d.showVersions === "boolean") cfg.display.showVersions = d.showVersions;
     if (typeof d.theme === "string") cfg.display.theme = d.theme;
+    if (d.glyphs === "nerd" || d.glyphs === "unicode" || d.glyphs === "ascii") cfg.display.glyphs = d.glyphs;
+    if (d.barStyle === "blocks" || d.barStyle === "rounded" || d.barStyle === "dots" || d.barStyle === "shaded") cfg.display.barStyle = d.barStyle;
     if (Array.isArray(d.rows)) {
       const valid: RowId[] = [];
       for (const id of d.rows) {

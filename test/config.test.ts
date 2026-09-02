@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default" },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default", glyphs: "unicode", barStyle: "blocks" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
@@ -194,4 +194,31 @@ test("display.theme: defaults \"default\", lenient string passthrough (validated
   const badPath = join(tmpDir, "theme-bad.json");
   writeFileSync(badPath, JSON.stringify({ display: { theme: 5 } }));
   assert.equal(loadConfig(badPath).config.display.theme, "default");
+});
+
+test("display.glyphs defaults unicode, accepts nerd/ascii, lenient on wrong type", () => {
+  const defPath = join(tmpDir, "glyphs-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.glyphs, "unicode");
+  const nerdPath = join(tmpDir, "glyphs-nerd.json");
+  writeFileSync(nerdPath, JSON.stringify({ display: { glyphs: "nerd" } }));
+  assert.equal(loadConfig(nerdPath).config.display.glyphs, "nerd");
+  const asciiPath = join(tmpDir, "glyphs-ascii.json");
+  writeFileSync(asciiPath, JSON.stringify({ display: { glyphs: "ascii" } }));
+  assert.equal(loadConfig(asciiPath).config.display.glyphs, "ascii");
+  const badPath = join(tmpDir, "glyphs-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { glyphs: 42 } }));
+  assert.equal(loadConfig(badPath).config.display.glyphs, "unicode");
+});
+
+test("display.barStyle defaults blocks, accepts rounded/dots/shaded, lenient on wrong type", () => {
+  const defPath = join(tmpDir, "bar-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.barStyle, "blocks");
+  const dotsPath = join(tmpDir, "bar-dots.json");
+  writeFileSync(dotsPath, JSON.stringify({ display: { barStyle: "dots" } }));
+  assert.equal(loadConfig(dotsPath).config.display.barStyle, "dots");
+  const badPath = join(tmpDir, "bar-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { barStyle: true } }));
+  assert.equal(loadConfig(badPath).config.display.barStyle, "blocks");
 });
