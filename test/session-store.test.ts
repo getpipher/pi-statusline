@@ -68,25 +68,25 @@ test("update+getSnapshot exposes identity, usage, context and span", () => {
   assert.equal(snap.spanMs, 2 * 3_600_000 + 12 * 60_000);
 });
 
-test("update captures thinking level from ctx.getThinkingLevel (v0.4.6, FB6)", () => {
+test("update captures thinking level from ctx.thinkingLevel (live getter, v0.4.7 fix)", () => {
+  // REAL pi contract (0.84.4): ExtensionContext.thinkingLevel is a live getter property
+  // (runner.js: get thinkingLevel() → runtime.getThinkingLevel()). The getThinkingLevel()
+  // METHOD lives on ExtensionActions (pi.*), NOT on ctx — probing for it was the v0.4.6
+  // bug that pinned the level at "off".
   const store = createSessionStore({ now: () => NOW, cwd: () => "/tmp/proj" });
-  store.update(
-    makeCtx({ getThinkingLevel: () => "high" }),
-    null,
-  );
-  assert.equal(store.getSnapshot().thinkingLevel, "high");
-  // a later change re-reads on the next update (render loop calls update per render)
-  store.update(
-    makeCtx({ getThinkingLevel: () => "off" }),
-    null,
-  );
-  assert.equal(store.getSnapshot().thinkingLevel, "off");
+  let level: string | undefined = "max";
+  store.update(makeCtx({ get thinkingLevel() { return level; } }), null);
+  assert.equal(store.getSnapshot().thinkingLevel, "max");
+  // a later /thinking change re-reads on the next update (render loop calls update per render)
+  level = "low";
+  store.update(makeCtx({ get thinkingLevel() { return level; } }), null);
+  assert.equal(store.getSnapshot().thinkingLevel, "low");
 });
 
-test("thinkingLevel defaults to \"off\" when ctx lacks the accessor (fake/older hosts)", () => {
+test("thinkingLevel defaults to \"off\" when the runtime omits the property", () => {
   const store = createSessionStore({ now: () => NOW, cwd: () => "/tmp/proj" });
   const ctx = makeCtx();
-  delete (ctx as Record<string, unknown>).getThinkingLevel;
+  delete (ctx as Record<string, unknown>).thinkingLevel;
   store.update(ctx, null);
   assert.equal(store.getSnapshot().thinkingLevel, "off");
 });

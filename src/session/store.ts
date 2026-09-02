@@ -99,12 +99,11 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
         contextTokens: contextUsage?.tokens ?? null,
         contextWindow: contextUsage?.contextWindow ?? 0,
         contextPercent: contextUsage?.percent ?? null,
-        // Defensive accessor: fake/older host contexts may lack getThinkingLevel —
-        // degrade to "off" rather than crash the render loop.
-        thinkingLevel:
-          typeof (ctx as unknown as { getThinkingLevel?: () => string }).getThinkingLevel === "function"
-            ? (ctx as unknown as { getThinkingLevel: () => string }).getThinkingLevel()
-            : "off",
+        // REAL contract (v0.4.7 fix): ExtensionContext.thinkingLevel is a live getter
+        // property ("when provided by the session runtime"). The getThinkingLevel()
+        // method is ExtensionActions-only (pi.*) — probing ctx for it made the level
+        // permanently "off". Property absent (older/fake hosts) → "off".
+        thinkingLevel: (ctx as { thinkingLevel?: string }).thinkingLevel ?? "off",
         spanMs: Math.max(0, now() - spanStart),
       };
     },
