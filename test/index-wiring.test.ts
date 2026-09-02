@@ -619,10 +619,10 @@ test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", 
 
     // identity: branch + dirty mark + ahead/behind
     assert.match(flat, /⎇ main\* ↑2 ↓1/, "git marks beside the branch");
-    // quota: est projection fragment rides the active provider's line
+    // quota: adapter segments only (est removed v0.4.6)
     const quotaLine = lines.find((l) => l.includes("zai-quota-line"));
     assert.ok(quotaLine, "quota line present");
-    assert.match(quotaLine, / \| est \d+(\.\d+)?k \(\d+%\)/, `est fragment: ${quotaLine}`);
+    assert.doesNotMatch(quotaLine, /est /, `no est fragment: ${quotaLine}`);
     // money: REPO/DAY lead (sess + burn removed v0.4.6)
     const moneyLine = lines.find((l) => l.includes("DAY $"));
     assert.ok(moneyLine, "money line present");

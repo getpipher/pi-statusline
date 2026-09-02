@@ -22,11 +22,12 @@ const QUOTA: QuotaResult = {
   fetchedAt: NOW,
 };
 
-test("renderZaiQuota produces the exact v0.4.1 segment format (usage%/elapsed% label (ceiling))", () => {
-  // 5h window: reset = NOW+2h55m → elapsed 2h05m of 5h = 42%; weekly: 6d of 7d elapsed = 86%.
+test("renderZaiQuota produces the v0.4.6 window format (5HRS/7DAY label-first, per-window reset)", () => {
+  // 5h window: reset = NOW+2h55m → elapsed 2h05m of 5h = 42%; weekly: 6d of 7d elapsed = 86%,
+  // reset NOW+24h → "24h0m".
   assert.equal(
     renderZaiQuota(QUOTA, NOW),
-    "zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m",
+    "zai 5HRS 75%/42% (2.0k) reset 2h55m | 7DAY 15%/86% (10k) reset 24h0m",
   );
 });
 
@@ -34,17 +35,16 @@ test("renderZaiQuota falls back to weekly when 5h window is missing", () => {
   const weeklyOnly = { ...QUOTA, fiveHour: null } as QuotaResult;
   const out = renderZaiQuota(weeklyOnly, NOW);
   assert.ok(out.startsWith("zai 7DAY 15%/86% (10k)"), out);
-  assert.ok(!out.includes("5h"));
+  assert.ok(!out.includes("5HRS"));
 });
 
-test("zaiSegments: per-window heat (5h% and weekly% tint independently), reset dim periphery", () => {
+test("zaiSegments: per-window heat tints independently; reset rides its own window segment", () => {
   const segs = zaiSegments(QUOTA, NOW);
   assert.deepEqual(
     segs.map((s) => ({ text: s.text, heat: s.heat, color: s.color })),
     [
-      { text: "zai 75%/42% 5h (2.0k)", heat: 75, color: undefined },
-      { text: " | 7DAY 15%/86% (10k)", heat: 15, color: undefined },
-      { text: " | reset 2h55m", heat: null, color: "dim" },
+      { text: "zai 5HRS 75%/42% (2.0k) reset 2h55m", heat: 75, color: undefined },
+      { text: " | 7DAY 15%/86% (10k) reset 24h0m", heat: 15, color: undefined },
     ],
   );
 });
@@ -52,16 +52,16 @@ test("zaiSegments: per-window heat (5h% and weekly% tint independently), reset d
 test("over-ceiling usage caps at 100%+ (raw heat still error-red)", async () => {
   const over = { ...QUOTA, fiveHour: { ...QUOTA.fiveHour!, percentage: 145 } };
   const segs = zaiSegments(over, NOW);
-  assert.equal(segs[0]!.text, "zai 100%+/42% 5h (2.0k)");
+  assert.equal(segs[0]!.text, "zai 5HRS 100%+/42% (2.0k) reset 2h55m");
   assert.equal(segs[0]!.heat, 145); // raw percentage → heat → error band
   const weeklyOver = { ...QUOTA, weekly: { ...QUOTA.weekly!, percentage: 130 } };
   assert.ok(zaiSegments(weeklyOver, NOW)[1]!.text.startsWith(" | 7DAY 100%+/86%"));
   // boundary: exactly 100 stays a plain number
   const atCeiling = { ...QUOTA, fiveHour: { ...QUOTA.fiveHour!, percentage: 100 } };
-  assert.ok(zaiSegments(atCeiling, NOW)[0]!.text.startsWith("zai 100%/42%"));
+  assert.ok(zaiSegments(atCeiling, NOW)[0]!.text.startsWith("zai 5HRS 100%/42%"));
 });
 
-test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent, reset dim; est appended", async () => {
+test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent; est removed (v0.4.6)", async () => {
   // Real adapter (segments path): per-window heat tints independently. The poller starts
   // empty — seed it through the offline fetch seam before rendering.
   const adapter = createZaiAdapter({
@@ -74,11 +74,8 @@ test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent,
   const row = createQuotaRow([adapter]);
   const frags = row.render(snap({}), 2)!;
   assert.deepEqual(frags, [
-    { text: "zai 75%/42% 5h (2.0k)", color: "warning" },
-    { text: " | 7DAY 15%/86% (10k)", color: "accent" },
-    { text: " | reset 2h55m", color: "dim" },
-    // Est: elapsed 125m → rate 720/h, remaining 175m → 1500 + 2100 = 3.6k (180%).
-    { text: " | est 3.6k (180%)", color: "text" },
+    { text: "zai 5HRS 75%/42% (2.0k) reset 2h55m", color: "warning" },
+    { text: " | 7DAY 15%/86% (10k) reset 24h0m", color: "accent" },
   ]);
 });
 

@@ -15,7 +15,7 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
 Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out | Cache: 68% hit
 REPO $12.34 | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75
-zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
+zai 5HRS 75%/42% (2.0k) reset 2h55m | 7DAY 15%/86% (10k) reset 1d0h
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
 04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4
 ```
@@ -24,8 +24,9 @@ Color semantics (theme-integrated hues): money values `success` (green), git bra
 and token flow `toolTitle` (blue), model `accent`; the ctx percentage traffic-lights CCS-style
 (`success` <50%, `warning` 50–89%, `error` ≥90% — window ratio shares the color, `Cache:` is
 `success`); the quota row tints each window segment by
-its own usage heat (`accent`, escalating to `warning`/`error` at ≥70%/≥90%), with the `reset`
-countdown dim and the `est` projection in `text`; values `text`; dirty `*` + ahead/behind
+its own usage heat (`accent`, escalating to `warning`/`error` at ≥70%/≥90%); each window
+segment carries its own `reset` countdown (v0.4.6), riding the window's heat color; values
+`text`; dirty `*` + ahead/behind
 ` ↑n ↓n` marks ride the branch in `toolTitle`; labels/separators dim; ambient row fully dim.
 Separator is ` | `. The deen strip uses CCS prayer states (v0.4.1): the **next prayer is
 green** (`success`), past prayers dim with `✓`, upcoming prayers plain `text` — steady colors,
@@ -143,7 +144,7 @@ trailing extra arguments are ignored.
 ## Status parity
 
 The footer now tracks the Claude Code statusline's live surface at ~14/14
-groups (identity/session, branch + dirty/ahead-behind, model, context bar +
-window, token flow, cache hit, session/day/7d/30d spend, sparkline, burn rate,
-quota bar + windows + reset, projection/est, git commits-today, version
+groups (identity/session, branch + dirty/ahead-behind, model, context +
+window, token flow, cache hit, day/7d/30d spend, quota windows + per-window
+reset, git commits-today, version
 stamps) — with the deen prayer strip and pluggable provider adapters beyond it.

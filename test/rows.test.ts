@@ -282,33 +282,14 @@ function fakeAdapter(renderText = "zai ▕███████░░░▏ 75% 
   };
 }
 
-test("quota row detail 2: est fragment appended (projected units + %)", () => {
+test("quota row: adapter string only at every detail; est removed (v0.4.6)", () => {
   const row = createQuotaRow([fakeAdapter()]);
   const frags = row.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 2)!;
-  assert.deepEqual(frags, [
-    { text: "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h", color: "warning" },
-    { text: " | est 7.5k (375%)", color: "text" },
-  ]);
-});
-
-test("quota row detail 1: est dropped, adapter string only (shrink-before-drop contract)", () => {
-  const row = createQuotaRow([fakeAdapter()]);
-  const frags = row.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 1)!;
   assert.deepEqual(frags, [{ text: "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h", color: "warning" }]);
-});
-
-test("quota row est omitted for dim (inactive) provider and when projection is null", () => {
-  const row = createQuotaRow([fakeAdapter()]);
-  // inactive provider → dim → no est
-  const dimFrags = row.render(snap({ now: NOW, session: session({ provider: "anthropic" }) }), 2)!;
-  assert.equal(dimFrags.length, 1);
-  // projection null (weekly-only data) → no est
-  const noFiveHour = createQuotaRow([{
-    ...fakeAdapter(),
-    current: () => ({ ...QUOTA_DATA, fiveHour: null }),
-  }]);
-  const frags = noFiveHour.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 2)!;
-  assert.equal(frags.length, 1);
+  const one = row.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 1)!;
+  assert.deepEqual(one, [{ text: "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h", color: "warning" }]);
+  const dim = row.render(snap({ now: NOW, session: session({ provider: "anthropic" }) }), 2)!;
+  assert.equal(dim.length, 1, "inactive provider → single dim fragment, no est");
 });
 
 // ── version stamps ──

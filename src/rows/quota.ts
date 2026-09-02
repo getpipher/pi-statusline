@@ -1,7 +1,5 @@
 // src/rows/quota.ts
 import { resolveQuotaAdapter, type AdapterSegment, type ProviderRowAdapter } from "../adapters/types.ts";
-import { projectBlock } from "../quota/project.ts";
-import { formatTokenCount } from "../format.ts";
 import type { ColorToken, Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
@@ -42,15 +40,6 @@ export function createQuotaRow(adapters: ProviderRowAdapter<any>[]): Row {
         }
       } else {
         frags.push({ text: winner.render(data, dim), color: dim ? "dim" : heatColor(winner, data) });
-      }
-
-      // Est rides the ACTIVE provider's row only (a dim subscription projection is
-      // noise), and is the quota row's first shrink casualty (detail >= 2).
-      if (detail >= 2 && !dim) {
-        const proj = projectBlock(data as Parameters<typeof projectBlock>[0], snapshot.now);
-        if (proj) {
-          frags.push({ text: ` | est ${formatTokenCount(proj.units)} (${proj.percent}%)`, color: "text" });
-        }
       }
       return frags;
     },

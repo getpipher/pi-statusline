@@ -12,15 +12,13 @@ export interface ZaiAdapterDeps {
   onRefresh?: () => void;
 }
 
-// Window segment pieces (v0.4.1, RECTOR format): `usage%/window-elapsed%` + ceiling —
-// e.g. `3%/50% 5h (28k)`. usage% from the API; elapsed% from the window clock; ceiling =
-// the plan's max credits for that window (console "Credits x / 28K"), NOT current burn.
-// Label placement differs per window: `5h` suffixes (window duration), `7DAY` prefixes
-// (CCS money-label style, RECTOR: drop our `wk`).
+// Window segment pieces (v0.4.6, RECTOR format): `LABEL usage%/window-elapsed% (ceiling)
+// reset <countdown>` — label-first for BOTH windows (`5HRS` matching the CCS `7DAY` label),
+// each window carrying its own reset countdown. ceiling = the plan's max credits for that
+// window (console "Credits x / 28K"), NOT current burn.
 // Usage percent display: z.ai reports >100 when usage exceeds the window ceiling (GLM
 // allows throttled overage) — cap at `100%+` so the segment never reads like a bug
-// (RECTOR pick, v0.4.5). Raw magnitude still lives in the `est` projection; heat uses
-// the RAW percentage, so >100 keeps error-red.
+// (RECTOR pick, v0.4.5). Heat uses the RAW percentage, so >100 keeps error-red.
 function usagePercent(w: QuotaLimit): string {
   return w.percentage > 100 ? "100%+" : `${w.percentage}%`;
 }
@@ -33,24 +31,31 @@ function windowCeiling(w: QuotaLimit): string {
   return `(${formatTokenCount(w.usage)})`;
 }
 
-// Pure segment list (preferred by the quota row — per-window heat tints). Weekly uses the
-// CCS label `7DAY` (RECTOR: drop our `wk`); reset is its own dim periphery segment.
+function windowReset(w: QuotaLimit, now: number): string {
+  return typeof w.nextResetTime === "number" && Number.isFinite(w.nextResetTime)
+    ? ` reset ${formatReset(w.nextResetTime, now)}`
+    : "";
+}
+
+// Pure segment list (preferred by the quota row — per-window heat tints). Labels are
+// CCS-style uppercase (`5HRS`/`7DAY`); reset is part of its window segment so the
+// countdown is unambiguous per window (v0.4.6).
 export function zaiSegments(data: QuotaResult, now: number): AdapterSegment[] {
   const segs: AdapterSegment[] = [];
   // The first rendered segment carries the `zai` label; later ones own the " | " separator
   // (weekly-only data → `zai 7DAY …`, never an orphan leading separator).
   const prefix = (text: string): string => (segs.length === 0 ? `zai ${text}` : ` | ${text}`);
   if (data.fiveHour) {
-    segs.push({ text: prefix(`${windowPercents(data.fiveHour, FIVE_HOUR_MS, now)} 5h ${windowCeiling(data.fiveHour)}`), heat: data.fiveHour.percentage });
+    segs.push({
+      text: prefix(`5HRS ${windowPercents(data.fiveHour, FIVE_HOUR_MS, now)} ${windowCeiling(data.fiveHour)}${windowReset(data.fiveHour, now)}`),
+      heat: data.fiveHour.percentage,
+    });
   }
   if (data.weekly) {
-    segs.push({ text: prefix(`7DAY ${windowPercents(data.weekly, WEEK_MS, now)} ${windowCeiling(data.weekly)}`), heat: data.weekly.percentage });
-  }
-  const resets = [data.fiveHour?.nextResetTime, data.weekly?.nextResetTime].filter(
-    (t): t is number => typeof t === "number",
-  );
-  if (resets.length > 0) {
-    segs.push({ text: prefix(`reset ${formatReset(Math.min(...resets), now)}`), heat: null, color: "dim" });
+    segs.push({
+      text: prefix(`7DAY ${windowPercents(data.weekly, WEEK_MS, now)} ${windowCeiling(data.weekly)}${windowReset(data.weekly, now)}`),
+      heat: data.weekly.percentage,
+    });
   }
   return segs;
 }
