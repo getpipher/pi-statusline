@@ -10,6 +10,7 @@ import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
 import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
 import { resolveQuotaAdapter, type ProviderRowAdapter } from "./adapters/types.ts";
+import { KNOWN_ROW_IDS } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createContextRow } from "./rows/context.ts";
@@ -284,7 +285,7 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>)",
+    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
@@ -333,6 +334,15 @@ export function activateStatusline(
           requestRenderFn?.();
           break;
         }
+        case "list-rows":
+          ctx.ui.notify(`Rows: ${config.display.rows.join(", ")} (valid: ${KNOWN_ROW_IDS.join(", ")})`, "info");
+          break;
+        case "set-rows":
+          config = { ...config, display: { ...config.display, rows: action.ids } };
+          saveConfig(dependencies.configPath, config);
+          ctx.ui.notify(`Row order set: ${action.ids.join(", ")}`, "info");
+          requestRenderFn?.();
+          break;
         case "error":
           ctx.ui.notify(action.message, "error");
           break;

@@ -586,3 +586,40 @@ test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", 
     }
   }
 });
+
+// ── v2 P3 wiring: /statusline rows — persist order + notify + re-render ──
+
+test("v2 P3 wiring: rows command persists display order and notifies", async () => {
+  const h = makeHarness();
+  try {
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    const command = h.commands.get("statusline");
+    assert.ok(command);
+
+    // list-rows: notify with current order + valid hint
+    await command.handler("rows", h.ctx);
+    const listed = h.notifications.filter((n) => n.message.startsWith("Rows:"));
+    assert.equal(listed.length, 1);
+    assert.match(listed[0]!.message, /identity, ctx, money, quota, deen, ambient/);
+    assert.match(listed[0]!.message, /\(valid: /);
+
+    // set-rows: persisted to the config file + notify + re-render
+    const before = h.renderRequests();
+    await command.handler("rows deen,identity", h.ctx);
+    const persisted = JSON.parse(readFileSync(h.configPath, "utf8")) as { display: { rows: string[] } };
+    assert.deepEqual(persisted.display.rows, ["deen", "identity"]);
+    assert.ok(h.notifications.some((n) => n.message === "Row order set: deen, identity"), "set-rows notify");
+    assert.ok(h.renderRequests() > before, "set-rows forces a re-render");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
