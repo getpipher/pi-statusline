@@ -183,9 +183,9 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
     assert.match(flat, /wiring-smoke/);
     assert.match(flat, /glm-5\.2/);
     assert.match(flat, /⎇ main/);
-    // ctx
-    assert.match(flat, /↑1\.5k ↓700/);
-    assert.match(flat, /25%/);
+    // ctx (CCS presentation, v0.4.6)
+    assert.match(flat, /Tokens: 1\.5K in \/ 700 out/);
+    assert.match(flat, /Ctx: 25%/);
     // money
     assert.match(flat, /sess/);
     // quota line, colored muted (active provider)

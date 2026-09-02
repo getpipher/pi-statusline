@@ -5,6 +5,7 @@ import {
   formatMoney,
   formatSpan,
   formatTokenCount,
+  formatTokensHuman,
   formatClock,
   renderBar,
   renderSparkline,
@@ -17,6 +18,16 @@ test("formatTokenCount formats <1k plain and k-values with one decimal under 10k
   assert.equal(formatTokenCount(999), "999");
   assert.equal(formatTokenCount(6200), "6.2k");
   assert.equal(formatTokenCount(48_000), "48k");
+});
+
+test("formatTokensHuman (CCS-exact): one decimal always for K/M, uppercase unit, plain below 1000", () => {
+  assert.equal(formatTokensHuman(0), "0");
+  assert.equal(formatTokensHuman(999), "999");
+  assert.equal(formatTokensHuman(6200), "6.2K");
+  assert.equal(formatTokensHuman(48_000), "48.0K");
+  assert.equal(formatTokensHuman(200_000), "200.0K");
+  assert.equal(formatTokensHuman(1_000_000), "1.0M");
+  assert.equal(formatTokensHuman(2_340_000), "2.3M");
 });
 
 test("formatMoney always shows two decimals, no grouping", () => {

@@ -13,7 +13,7 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 
 ```
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
-ctx 34% 68k/200k | ↑48k ↓6.2k | cache 68%
+Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out | Cache: 68% hit
 REPO $12.34 | $1.24 sess | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75 api-eq ▁▁▂▄▂▁▇ | $0.39/hr
 zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
@@ -21,7 +21,9 @@ deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 
 ```
 
 Color semantics (theme-integrated hues): money values + sparkline `success` (green), git branch
-and token flow `toolTitle` (blue), model `accent`; the quota row tints each window segment by
+and token flow `toolTitle` (blue), model `accent`; the ctx percentage traffic-lights CCS-style
+(`success` <50%, `warning` 50–89%, `error` ≥90% — window ratio shares the color, `Cache:` is
+`success`); the quota row tints each window segment by
 its own usage heat (`accent`, escalating to `warning`/`error` at ≥70%/≥90%), with the `reset`
 countdown dim and the `est` projection in `text`; values `text`; dirty `*` + ahead/behind
 ` ↑n ↓n` marks ride the branch in `toolTitle`; labels/separators dim; ambient row fully dim.

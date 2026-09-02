@@ -5,6 +5,14 @@ export function formatTokenCount(count: number): string {
   return thousands < 10 ? `${thousands.toFixed(1)}k` : `${Math.round(thousands)}k`;
 }
 
+// CCS-exact human token counts (claude-code-statusline _format_tokens_human): one decimal
+// always for K/M, uppercase unit, plain integer below 1000 (e.g. 68.0K, 200.0K, 1.0M).
+export function formatTokensHuman(count: number): string {
+  if (!Number.isFinite(count) || count < 1000) return `${Math.floor(Math.max(0, count))}`;
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  return `${(count / 1000).toFixed(1)}K`;
+}
+
 export function formatMoney(n: number): string {
   return n.toFixed(2);
 }

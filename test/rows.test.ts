@@ -127,7 +127,7 @@ test("ambient row: clock is rendered from snapshot.now in local time", () => {
   assert.ok(!out.endsWith(" ·")); // no dangling separator when statuses empty
 });
 
-// ── Task 7: context (ctx) row ──
+// ── context (ctx) row ──
 import { createContextRow } from "../src/rows/context.ts";
 
 const CTX_SESSION = session({
@@ -137,42 +137,50 @@ const CTX_SESSION = session({
   contextPercent: 34,
 });
 
-test("ctx row: percent + window + tokens + cache hit (detail 2; bar removed v0.4.1)", () => {
+// v0.4.6 (FB6): CCS adoption — `Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out |
+// Cache: 68% hit`; pct traffic-light (CCS defaults: <50 success, 50–89 warning, ≥90 error).
+test("ctx row CCS: Ctx:/Tokens:/Cache: labels, traffic-light pct, human tokens (detail 2)", () => {
   const row = createContextRow();
   const frags = row.render(snap({ session: CTX_SESSION }), 2)!;
   assert.deepEqual(frags, [
-    { text: "ctx", color: "dim" },
-    { text: " 34%", color: "text" },
-    { text: " 68k/200k", color: "text" },
-    { text: " | ↑48k ↓6.2k", color: "toolTitle" },
-    { text: " | cache 68%", color: "muted" },
+    { text: "Ctx:", color: "dim" },
+    { text: " 34%", color: "success" },
+    { text: " (68.0K/200.0K)", color: "success" },
+    { text: " | Tokens: 48.0K in / 6.2K out", color: "toolTitle" },
+    { text: " | Cache: 68% hit", color: "success" },
   ]);
 });
 
-test("ctx row: detail 1 drops window + cache; detail 0 drops tokens too", () => {
+test("ctx row CCS: pct traffic-light bands — success <50, warning 50–89, error ≥90", () => {
+  const row = createContextRow();
+  const colorAt = (pct: number) =>
+    row.render(snap({ session: { ...CTX_SESSION, contextPercent: pct } }), 0)![1]!.color;
+  assert.equal(colorAt(49), "success");
+  assert.equal(colorAt(50), "warning");
+  assert.equal(colorAt(89), "warning");
+  assert.equal(colorAt(90), "error");
+});
+
+test("ctx row CCS: detail 1 drops window + cache; detail 0 pct only", () => {
   const row = createContextRow();
   const one = plain(row.render(snap({ session: CTX_SESSION }), 1)!);
-  assert.ok(one.includes("34%") && one.includes("↑48k ↓6.2k"), "detail 1: bar + % + tokens");
-  assert.ok(!one.includes("68k/200k") && !one.includes("cache"), "detail 1: no window, no cache");
+  assert.equal(one, "Ctx: 34% | Tokens: 48.0K in / 6.2K out");
   const zero = plain(row.render(snap({ session: CTX_SESSION }), 0)!);
-  assert.ok(zero.includes("34%"), "detail 0: bar + %");
-  assert.ok(!zero.includes("↑") && !zero.includes("cache"), "detail 0: no tokens, no cache");
+  assert.equal(zero, "Ctx: 34%");
 });
 
-test("ctx row: no bar fragments at any detail (v0.4.1 bar removal)", () => {
-  const row = createContextRow();
-  for (const pct of [34, 75, 91]) {
-    const frags = row.render(snap({ session: { ...CTX_SESSION, contextPercent: pct } }), 2)!;
-    assert.ok(!frags.some((f) => f.text.includes("╳") || f.text.includes("░")), `no bar cells at ${pct}%`);
-  }
-});
-
-test("ctx row: cache hit uses cacheRead/(cacheRead+input); omitted when denominator 0", () => {
+test("ctx row CCS: cache hit uses cacheRead/(cacheRead+input); omitted when denominator 0", () => {
   const row = createContextRow();
   const out = plain(row.render(snap({ session: CTX_SESSION }), 2));
-  assert.ok(out.includes("cache 68%")); // 100_000/(100_000+48_000) = 0.6757… → Math.round → 68
+  assert.ok(out.includes("Cache: 68% hit")); // 100_000/(100_000+48_000) = 0.6757… → Math.round → 68
   const zero = row.render(snap({ session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 } }) }), 2);
   assert.ok(!plain(zero).includes("cache"));
+});
+
+test("ctx row CCS: percent falls back to tokens/window when contextPercent is null", () => {
+  const row = createContextRow();
+  const out = plain(row.render(snap({ session: { ...CTX_SESSION, contextPercent: null } }), 0)!);
+  assert.equal(out, "Ctx: 34%"); // 68_000/200_000 = 34%
 });
 
 // ── Task 8: money row ──
