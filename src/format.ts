@@ -34,21 +34,6 @@ export function splitBar(ratio: number, cells = 10): { filled: string; empty: st
   };
 }
 
-const SPARK_LEVELS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇"] as const;
-
-export function renderSparkline(values: number[]): string {
-  if (values.length === 0) return "";
-  const max = Math.max(...values);
-  return values
-    .map((v) => {
-      if (max <= 0) return SPARK_LEVELS[0];
-      // Bottom 1/7th of the range renders at level 0; v == max reaches the top cell
-      // exactly. (round((v/max)*(len-1)) fails the pinned ramp [1..7] → ▁▂▃▄▅▆▇.)
-      const level = Math.max(0, Math.floor((v / max) * SPARK_LEVELS.length) - 1);
-      return SPARK_LEVELS[level] ?? SPARK_LEVELS[0];
-    })
-    .join("");
-}
 
 export function formatClock(ts: number): string {
   const d = new Date(ts);

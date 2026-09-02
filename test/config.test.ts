@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false, theme: "default" },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
@@ -72,21 +72,6 @@ test("loadConfig rejects invalid tier value", () => {
   assert.throws(() => loadConfig(path), /tier must be/);
 });
 
-test("display.burnAnchor parses session|block, defaults session, throws on invalid", () => {
-  // default (file without display.burnAnchor)
-  const defPath = join(tmpDir, "default.json");
-  writeFileSync(defPath, JSON.stringify({}));
-  assert.equal(loadConfig(defPath).config.display.burnAnchor, "session");
-  // accepted value
-  const blockPath = join(tmpDir, "block.json");
-  writeFileSync(blockPath, JSON.stringify({ display: { burnAnchor: "block" } }));
-  assert.equal(loadConfig(blockPath).config.display.burnAnchor, "block");
-  // invalid throws — tier-throw precedent (strict enum via loadConfig)
-  const badPath = join(tmpDir, "bad.json");
-  writeFileSync(badPath, JSON.stringify({ display: { burnAnchor: "hourly" } }));
-  assert.throws(() => loadConfig(badPath), /burnAnchor must be "session" or "block"/);
-});
-
 test("display.showVersions lenient boolean, defaults false (showTokens precedent)", () => {
   const defPath = join(tmpDir, "versions-default.json");
   writeFileSync(defPath, JSON.stringify({}));
@@ -120,7 +105,6 @@ test("v2: defaults include the full canonical row order and gates on", () => {
   const { config, unknownRows } = loadConfig(path);
   assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
   assert.equal(config.display.bars, true);
-  assert.equal(config.display.sparkline, true);
   assert.deepEqual(unknownRows, []);
 });
 
@@ -147,7 +131,7 @@ test("v2: non-string or non-array rows fall back to defaults", () => {
   assert.equal(config.display.bars, true);
 });
 
-test("v1 back-compat: a v1 file (no rows/bars/sparkline) loads cleanly with defaults merged", () => {
+test("v1 back-compat: a v1 file (no rows/bars) loads cleanly with defaults merged", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({
     enabled: true,

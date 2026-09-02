@@ -16,7 +16,6 @@ export interface RowSnapshot {
   config: StatuslineConfig;
   deen: DeenSnapshot | null; // P2 — null until DeenSource provides data (row omitted)
   git: GitSnapshot | null; // Task 7 — declare NOW with the type import so Task 5/7 share one snapshot migration
-  quotaWindow: { startMs: number; endMs: number; cost: number } | null;
   versions: { sl: string; pi: string | null }; // SL = our package, PI = linked host package (null = unresolved)
   order?: RowId[]; // optional echo of the display order (unused by rows; kept for debugging)
 }

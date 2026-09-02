@@ -8,7 +8,6 @@ import {
   formatTokensHuman,
   formatClock,
   renderBar,
-  renderSparkline,
   formatReset,
   splitBar,
 } from "../src/format.ts";
@@ -45,13 +44,6 @@ test("renderBar renders a 10-cell block bar clamped to [0,1]", () => {
   assert.equal(renderBar(1.5), "▕██████████▏");
   assert.equal(renderBar(-1), "▕░░░░░░░░░░▏");
   assert.equal(renderBar(Number.NaN), "▕░░░░░░░░░░▏");
-});
-
-test("renderSparkline scales the last values to the max as 7 block levels", () => {
-  assert.equal(renderSparkline([]), "");
-  assert.equal(renderSparkline([0, 0, 0]), "▁▁▁");
-  assert.equal(renderSparkline([1, 2, 3, 4, 5, 6, 7]), "▁▂▃▄▅▆▇");
-  assert.equal(renderSparkline([7, 0, 0, 0, 0, 0, 3.5]), "▇▁▁▁▁▁▃");
 });
 
 test("formatClock renders 24h local HH:MM", () => {

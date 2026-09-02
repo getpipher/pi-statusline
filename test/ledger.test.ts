@@ -83,7 +83,7 @@ test("malformed lines are skipped on scan and warn fires at most once", () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("getSnapshot aggregates today/7d/30d and 7-day sparkline by local day", () => {
+test("getSnapshot aggregates today/7d/30d by local day", () => {
   const dir = mkdtempSync(join(tmpdir(), "ledger-"));
   const filePath = join(dir, "ledger.jsonl");
   const now = Date.UTC(2026, 7, 30, 10, 0); // 18:00 SGT, still Aug 30 local
@@ -102,10 +102,6 @@ test("getSnapshot aggregates today/7d/30d and 7-day sparkline by local day", () 
   assert.deepEqual(snap.todayCost, 1.24);
   assert.deepEqual(snap.last7Cost, 1.24 + 2.0);
   assert.deepEqual(snap.last30Cost, 1.24 + 2.0 + 4.0);
-  assert.equal(snap.daily.length, 7);
-  assert.deepEqual(snap.daily[6], 1.24); // today, newest
-  assert.deepEqual(snap.daily[5], 2.0); // yesterday
-  assert.deepEqual(snap.daily[0], 0);   // 6 days ago — no spend
   rmSync(dir, { recursive: true, force: true });
 });
 

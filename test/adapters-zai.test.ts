@@ -144,7 +144,6 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     config: DEFAULT_CONFIG,
     deen: null,
     git: null,
-    quotaWindow: null,
     versions: { sl: "", pi: null },
     ...partial,
   };

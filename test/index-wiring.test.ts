@@ -187,7 +187,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
     assert.match(flat, /Tokens: 1\.5K in \/ 700 out/);
     assert.match(flat, /Ctx: 25%/);
     // money
-    assert.match(flat, /sess/);
+    assert.match(flat, /DAY \$/);
     // quota line, colored muted (active provider)
     assert.ok(lines.some((l) => l.includes("zai-quota-line")), "quota line present");
     assert.equal(h.colors.find((c) => c.text.includes("zai-quota-line"))?.color, "muted");
@@ -227,7 +227,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
         const lines2 = h2.footerHolder.current.render(500);
         const flat2 = lines2.join("\n");
         assert.ok(!lines2.some((l) => l.includes("zai-quota-line") || l.includes("zai-dim")), "quota row omitted when adapter holds no data");
-        assert.match(flat2, /0\.00 sess/, "money row still renders (session honesty)");
+        assert.match(flat2, /DAY \$0\.00/, "money row still renders (zero-cost honesty)");
       } finally {
         h2.footerHolder.current?.dispose();
         rmSync(h2.tmp, { recursive: true, force: true });
@@ -376,7 +376,7 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
     // Fix wave (review): the ledger repo accessor is wired (basename(cwd) — "pi-statusline"
     // under the test runner), so both harness entries attribute to it → repoCost 1.00
     // (0.25 + 0.75) and the money row leads with the all-time REPO total.
-    const moneyLine = lines.find((l) => l.includes(" sess"));
+    const moneyLine = lines.find((l) => l.includes("DAY $"));
     assert.ok(moneyLine, "money line present");
     assert.match(moneyLine, /REPO \$1\.00/, "REPO all-time total renders end-to-end (repo accessor wired)");
     assert.ok(!/^\s*\|/.test(moneyLine), "no orphan leading separator");
@@ -417,47 +417,6 @@ test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
     const lines = h.footerHolder.current!.render(500);
     assert.ok(lines.length >= 4, "other rows unaffected");
     assert.ok(!lines.some((l) => l.includes("Fajr") || l.includes("Rabīʿ")), "deen line absent when current() is null");
-  } finally {
-    h.footerHolder.current?.dispose();
-    rmSync(h.tmp, { recursive: true, force: true });
-  }
-});
-
-// ── v2 P3 wiring: burnAnchor "block" — $/hr from the zai 5h window + ledger.costSince ──
-
-test("v2 P3 wiring: burnAnchor block derives $/hr from quotaWindow cost", async () => {
-  const h = makeHarness();
-  try {
-    // Window: QUOTA.fiveHour.nextResetTime = (module-load) now + 1h → window ≈ [now−4h, now+1h].
-    // Put both usage entries inside that window (now−2h, now−1h) with cost 0.5 + 1.0.
-    const now = Date.now();
-    const entries = h.ctxObject.sessionManager.getEntries() as Array<{
-      timestamp: string;
-      message: { usage: { cost: { total: number } } };
-    }>;
-    entries[0]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
-    entries[1]!.timestamp = new Date(now - 3_600_000).toISOString();
-    entries[0]!.message.usage.cost = { total: 0.5 };
-    entries[1]!.message.usage.cost = { total: 1.0 };
-
-    writeFileSync(h.configPath, JSON.stringify({ display: { burnAnchor: "block" } }));
-    activateStatusline(h.pi, {
-      authJsonPath: join(h.tmp, "auth.json"),
-      configPath: h.configPath,
-      ledgerPath: join(h.tmp, "ledger.jsonl"),
-      readKey: () => "fixture-key",
-          makeGitSource: () => h.fakeGitSource,
-      makeAdapters: () => [h.fakeZaiAdapter],
-    });
-    h.handlers.get("session_start")?.({}, h.ctx);
-    assert.ok(h.footerHolder.current, "footer installed");
-    const moneyLine = h.footerHolder.current.render(500).find((l) => l.includes(" sess"));
-    assert.ok(moneyLine, "money line present");
-    // Block cost 1.5; elapsed = renderNow − (reset − 5h) = 4h + δ where δ = module-load→render
-    // drift (≪ 1s here) → perHour = 0.37499… → "$0.37/hr" — block-derived, NOT the
-    // session formula (session span ≈ 0 would render a huge $/hr). δ would need to
-    // exceed 394 s to flip the rounding — impossible for a single test run.
-    assert.match(moneyLine, /\$0\.37\/hr/, `block burn on money line: ${moneyLine}`);
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });
@@ -641,7 +600,7 @@ test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", 
     entries[1]!.message.usage.cost = { total: 1.0 };
 
     writeFileSync(h.configPath, JSON.stringify({
-      display: { showVersions: true, burnAnchor: "block", theme: "mono" },
+      display: { showVersions: true, theme: "mono" },
     }));
     activateStatusline(h.pi, {
       authJsonPath: join(h.tmp, "auth.json"),
@@ -664,10 +623,10 @@ test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", 
     const quotaLine = lines.find((l) => l.includes("zai-quota-line"));
     assert.ok(quotaLine, "quota line present");
     assert.match(quotaLine, / \| est \d+(\.\d+)?k \(\d+%\)/, `est fragment: ${quotaLine}`);
-    // money: block-anchored burn (1.5 over ≈4h — see the Task 5 wiring test for the bounds)
-    const moneyLine = lines.find((l) => l.includes(" sess"));
+    // money: REPO/DAY lead (sess + burn removed v0.4.6)
+    const moneyLine = lines.find((l) => l.includes("DAY $"));
     assert.ok(moneyLine, "money line present");
-    assert.match(moneyLine, /\$0\.37\/hr/, `block burn: ${moneyLine}`);
+    assert.doesNotMatch(moneyLine, /sess|api-eq|\/hr/, `decluttered money line: ${moneyLine}`);
     // ambient: commits-today + version stamps
     const ambientLine = lines.find((l) => l.includes("commits 4"));
     assert.ok(ambientLine, "commits-today on ambient line");

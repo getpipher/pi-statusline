@@ -14,13 +14,13 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 ```
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
 Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out | Cache: 68% hit
-REPO $12.34 | $1.24 sess | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75 api-eq ▁▁▂▄▂▁▇ | $0.39/hr
+REPO $12.34 | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75
 zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
 04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4
 ```
 
-Color semantics (theme-integrated hues): money values + sparkline `success` (green), git branch
+Color semantics (theme-integrated hues): money values `success` (green), git branch
 and token flow `toolTitle` (blue), model `accent`; the ctx percentage traffic-lights CCS-style
 (`success` <50%, `warning` 50–89%, `error` ≥90% — window ratio shares the color, `Cache:` is
 `success`); the quota row tints each window segment by
@@ -54,8 +54,6 @@ In `~/.pi/agent/settings.json`:
   "display": {
     "rows": ["identity", "ctx", "money", "quota", "deen", "ambient"],
     "bars": true,
-    "sparkline": true,
-    "burnAnchor": "session",
     "showVersions": false,
     "theme": "default"
   }
@@ -67,11 +65,7 @@ In `~/.pi/agent/settings.json`:
   never an invention. Unknown ids are dropped with a one-time warning (surfaced
   as a notify, once per id per session — handy for typo-spotting).
 - **`display.bars`** — inert since v0.4.1 (the ctx and quota bars were removed per RECTOR; the key is still accepted for back-compat).
-- **`display.sparkline`** — gates the 7-day sparkline in the money line.
-- **`display.burnAnchor`** — the `$X/hr` anchor: `"session"` (default) burns session
-  cost over the active session's wall time; `"block"` burns the 5h-block ledger
-  cost over the block elapsed (CC-style) when the active z.ai window is known,
-  falling back to the session formula otherwise.
+- **`display.sparkline` / `display.burnAnchor`** — removed in v0.4.6 (sparkline + burn rate decluttered away per RECTOR); the keys are ignored.
 - **`display.showVersions`** — appends `SL:<version> · PI:<version>` stamps to the
   ambient line (default off). `SL` is this package; `PI` is the linked
   `@earendil-works/pi-coding-agent` (omitted when unresolvable).
@@ -84,9 +78,6 @@ In `~/.pi/agent/settings.json`:
   `or $X.XX left · $X.XX today · top: <model> $X.XX` — `today`/`top` come from
   the **local ledger's** attributed spend (the credits API has no per-window or
   per-model breakdown).
-  The `api-eq` marker on the 30DAY fragment marks the `$` meter as **tokens × published
-  API rates** — what the same usage would cost on pay-as-you-go; REPO carries the same
-  calculation, repo-scoped and all-time.
 - **`deen`** — prayer-tracker settings (see **Deen** below). `city` may be
   `"auto"` for IP-based geolocation; `method` is the [aladhan calculation
   method](https://aladhan.com/calculation-methods) ("auto" = aladhan default);
@@ -109,9 +100,7 @@ lines without a field record `"unknown"` and never count toward the REPO total
 or provider-scoped sums; historical lines are never re-attributed. The money
 line leads with
 `REPO $X` — the all-time total for the current repo (once the repo has
-recorded any spend; a fresh ledger renders without the lead). `$` is folded into
-each money value (`$1.24 sess`), CC-style; with fewer than two usage entries
-there is no burn rate yet and the row ends ` | —` instead. It is safe to
+recorded any spend; a fresh ledger renders without the lead). It is safe to
 delete at any time: the footer rebuilds
 from an empty ledger and **historical sessions are not re-scanned** — day/7d/
 30d totals simply start over from the next session.

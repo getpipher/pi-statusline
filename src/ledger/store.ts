@@ -21,7 +21,6 @@ export interface LedgerSnapshot {
   todayCost: number;
   last7Cost: number;
   last30Cost: number;
-  daily: number[]; // last 7 local-day sums, oldest → newest (sparkline input)
   repoCost: number; // all-time sum for the CURRENT repo (0 when no repo accessor / unknown)
 }
 
@@ -181,8 +180,6 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
         for (let d = from; d <= to; d++) sum += byDay.get(d) ?? 0;
         return sum;
       };
-      const daily: number[] = [];
-      for (let d = todayIdx - 6; d <= todayIdx; d++) daily.push(byDay.get(d) ?? 0);
       // All-time total for the CURRENT repo only. Legacy/unattributed lines ("unknown")
       // and other repos never count — and an absent repo accessor (current "unknown")
       // yields 0, never a mixed-repo sum.
@@ -194,7 +191,6 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
         todayCost: byDay.get(todayIdx) ?? 0,
         last7Cost: sumDays(todayIdx - 6, todayIdx),
         last30Cost: sumDays(todayIdx - 29, todayIdx),
-        daily,
         repoCost,
       };
     },

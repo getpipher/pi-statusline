@@ -17,7 +17,6 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     config: DEFAULT_CONFIG,
     deen: null,
     git: null,
-    quotaWindow: null,
     versions: { sl: "0.4.0", pi: "0.84.4" },
     ...partial,
   };
@@ -194,69 +193,58 @@ const LEDGER = {
   repoCost: 12.34,
 };
 
-test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
+// v0.4.6 (FB6): sess / api-eq / sparkline / burn rate all removed — the row is
+// REPO | DAY | 7DAY | 30DAY (CCS label-first money shape).
+test("money row: REPO/DAY/7DAY/30DAY (detail 2)", () => {
   const row = createMoneyRow();
   const frags = row.render(snap({
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
   }), 2)!;
-  // Sparkline: [1,2,3,5,3,2,8.4] scaled to max 8.4 → level = max(0, floor(v/max*7)-1)
-  // (Task 1's pinned mapping) → ▁▁▂▄▂▁▇. Burn: cost 1.24 over span 3h12m = 1.24 / 3.2h = 0.3875 → "0.39".
-  // CC-style shape (reconciled): no standalone "$" label — folded into each value; REPO lead when repoCost > 0.
   assert.deepEqual(frags, [
     { text: "REPO $12.34", color: "text" },
-    { text: " | $1.24 sess", color: "text" },
     { text: " | DAY $8.40", color: "success" },
     { text: " | 7DAY $31.20", color: "success" },
     { text: " | 30DAY $118.75", color: "success" },
-    { text: " api-eq", color: "dim" },
-    { text: " ▁▁▂▄▂▁▇", color: "success" },
-    { text: " | $0.39/hr", color: "muted" },
   ]);
 });
 
-test("money row: burn rate renders — when fewer than 2 usage entries", () => {
+test("money row: detail 1 drops 7DAY/30DAY; detail 0 drops the row entirely", () => {
   const row = createMoneyRow();
-  const out = plain(row.render(snap({
-    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 5, count: 1 } }),
-    ledger: LEDGER,
-  }), 2));
-  assert.ok(out.includes(" | —"));
-});
-
-test("money row: sparkline omitted when display.sparkline=false", () => {
-  const row = createMoneyRow();
-  const cfgSnap = snap({
-    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 2 } }),
-    ledger: LEDGER,
-    config: { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, sparkline: false } },
-  });
-  assert.ok(!plain(row.render(cfgSnap, 2)).includes("▁"));
-
   const one = plain(row.render(snap({
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
   }), 1));
-  assert.ok(one.includes("REPO $12.34") && one.includes("$1.24 sess") && one.includes("DAY $8.40") && one.includes("$0.39/hr"), `detail 1: ${one}`);
-  assert.ok(!one.includes("7d") && !one.includes("30d") && !one.includes("▁"), "detail 1: no 7d/30d/sparkline");
-  const zero = plain(row.render(snap({
+  assert.equal(one, "REPO $12.34 | DAY $8.40");
+  const zero = row.render(snap({
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
-  }), 0));
-  assert.equal(zero, "$1.24 sess", "detail 0: session cost alone");
+  }), 0);
+  assert.equal(zero, null, "detail 0: money is periphery — row omitted");
 });
 
-test("money row: REPO all-time total leads the row in bright text", () => {
+test("money row: no sess, api-eq, sparkline, or burn fragments at any detail", () => {
+  const row = createMoneyRow();
+  const out = plain(row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 5, count: 1 } }),
+    ledger: LEDGER,
+  }), 2)!);
+  assert.ok(!out.includes("sess"), "sess removed (v0.4.6)");
+  assert.ok(!out.includes("api-eq"), "api-eq removed (v0.4.6)");
+  assert.ok(!out.includes("▁"), "sparkline removed (v0.4.6)");
+  assert.ok(!out.includes("/hr") && !out.includes(" | —"), "burn rate removed (v0.4.6)");
+});
+
+test("money row: REPO omitted when 0; DAY leads then", () => {
   const row = createMoneyRow();
   const frags = row.render(snap({
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
-    ledger: { ...LEDGER, repoCost: 11529.35 },
-  }), 2)!;
-  assert.deepEqual(frags[0], { text: "REPO $11529.35", color: "text" });
-  assert.deepEqual(frags[1], { text: " | $1.24 sess", color: "text" });
+    ledger: { ...LEDGER, repoCost: 0 },
+  }), 1)!;
+  assert.deepEqual(frags, [{ text: "DAY $8.40", color: "success" }]);
 });
 
-// ── Task 4: quota row est fragment ──
+// ── quota row ──
 import { createQuotaRow } from "../src/rows/quota.ts";
 import type { ProviderRowAdapter } from "../src/adapters/types.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
@@ -323,51 +311,7 @@ test("quota row est omitted for dim (inactive) provider and when projection is n
   assert.equal(frags.length, 1);
 });
 
-// ── Task 5: burn anchor ──
-const BURN_BLOCK = { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, burnAnchor: "block" as const } };
-const BURN_SESSION_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 99, count: 5 };
-
-test("money row block anchor: $/hr from quotaWindow cost over block elapsed", () => {
-  const s = snap({
-    now: Date.UTC(2026, 7, 30, 9, 0),
-    ledger: LEDGER,
-    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
-    config: BURN_BLOCK,
-    session: session({ usage: BURN_SESSION_USAGE, spanMs: 60_000 }),
-  });
-  const frags = createMoneyRow().render(s, 1)!;
-  assert.ok(frags.some((f) => f.text === " | $1.50/hr"), `expected block burn, got: ${frags.map((f) => f.text).join("")}`); // 3.0 over 2h
-});
-
-test("money row block anchor falls back to session when window missing/young/stale", () => {
-  // quotaWindow null → session formula (99 cost over 1h span)
-  const s1 = snap({
-    ledger: LEDGER,
-    config: BURN_BLOCK,
-    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
-  });
-  assert.ok(createMoneyRow().render(s1, 1)!.some((f) => f.text === " | $99.00/hr"));
-  // elapsed < 60s → session fallback too
-  const s2 = snap({
-    ledger: LEDGER,
-    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 8, 59, 30), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
-    config: BURN_BLOCK,
-    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
-    now: Date.UTC(2026, 7, 30, 9, 0),
-  });
-  assert.ok(createMoneyRow().render(s2, 1)!.some((f) => f.text === " | $99.00/hr"));
-  // now past endMs (stale window) → session fallback too — covers the now ≤ endMs guard
-  const s3 = snap({
-    ledger: LEDGER,
-    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 9, 0), cost: 3.0 },
-    config: BURN_BLOCK,
-    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
-    now: Date.UTC(2026, 7, 30, 9, 30),
-  });
-  assert.ok(createMoneyRow().render(s3, 1)!.some((f) => f.text === " | $99.00/hr"));
-});
-
-// ── Task 6: version stamps ──
+// ── version stamps ──
 
 test("ambient versions fragment: gated by showVersions + detail 2; PI omitted when null", () => {
   const row = createAmbientRow();

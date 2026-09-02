@@ -9,7 +9,7 @@ import { createSessionStore, type SessionStore } from "./session/store.ts";
 import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
 import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
-import { resolveQuotaAdapter, type ProviderRowAdapter } from "./adapters/types.ts";
+import { type ProviderRowAdapter } from "./adapters/types.ts";
 import { KNOWN_ROW_IDS } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
@@ -23,7 +23,6 @@ import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
 import { applyThemeColor, THEME_PRESETS } from "./theme.ts";
-import { FIVE_HOUR_MS } from "./quota/project.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -224,16 +223,6 @@ export function activateStatusline(
           sessionStore.update(ctx, branch);
           const ledger = ensureLedger();
           ledger.reconcile(ctx.sessionManager.getEntries());
-          // Active 5h window (block burn anchor + est context): resolve like the quota
-          // row does, read fiveHour.nextResetTime defensively (adapters are any-typed).
-          let quotaWindow: RowSnapshot["quotaWindow"] = null;
-          const winner = resolveQuotaAdapter(adapters, sessionStore.getSnapshot().provider);
-          const winData = winner?.current() as { fiveHour?: { nextResetTime?: number } } | null | undefined;
-          const reset = winData?.fiveHour?.nextResetTime;
-          if (typeof reset === "number" && Number.isFinite(reset) && reset > Date.now()) {
-            const startMs = reset - FIVE_HOUR_MS;
-            quotaWindow = { startMs, endMs: reset, cost: ledger.costSince(startMs) };
-          }
           const snapshot: RowSnapshot = {
             now: Date.now(),
             width,
@@ -243,7 +232,6 @@ export function activateStatusline(
             config,
             deen: deenSource.current(),
             git: gitSource.get(),
-            quotaWindow,
             versions: dependencies.readVersions(),
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
