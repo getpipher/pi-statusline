@@ -22,7 +22,7 @@ import { createDeenSource, type DeenSource } from "./deen/source.ts";
 import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
-import { applyThemeColor, THEME_PRESETS } from "./theme.ts";
+import { applyThemeColor, THEME_PRESETS, DEFAULT_THEME_NAME } from "./theme.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -196,6 +196,11 @@ export function activateStatusline(
     pendingRowWarnings.clear();
   }
 
+  function hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const n = parseInt(hex.replace("#", ""), 16);
+    return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff };
+  }
+
   function installFooter(ctx: ExtensionContext): void {
     if (footerInstalled) return;
     ctx.ui.setFooter((tui, theme, footerData) => {
@@ -241,9 +246,20 @@ export function activateStatusline(
             notifiedThemeWarning = true;
             sessionCtx?.ui.notify(`pi-statusline: unknown display.theme "${themeName}" — using default (valid: ${Object.keys(THEME_PRESETS).join(", ")})`, "warning");
           }
-          // One theme pass: fragment colors → preset remap → theme.fg; fragments own all spacing.
+          // Theme pass: fragment colors → preset remap → theme.fg (or truecolor ANSI for hex presets).
+          const preset = THEME_PRESETS[themeName];
+          const useHex = preset != null && themeName !== DEFAULT_THEME_NAME;
           return lines.map((frags) =>
-            frags.map((f) => theme.fg(applyThemeColor(f.color, themeName).color, f.text)).join("")
+            frags.map((f) => {
+              if (useHex) {
+                const resolved = preset.tokens[f.color];
+                if (typeof resolved === "string" && resolved.startsWith("#")) {
+                  const { r, g, b } = hexToRgb(resolved);
+                  return `\x1b[38;2;${r};${g};${b}m${f.text}\x1b[0m`;
+                }
+              }
+              return theme.fg(f.color, f.text);
+            }).join("")
           );
         },
       };
