@@ -15,6 +15,12 @@ export interface StatuslineConfig {
     method: string;          // "auto" → aladhan default
     escalateMinutes: number;
   };
+  providers: {
+    openrouter: {
+      enabled: boolean;
+      pollIntervalMs: number;
+    };
+  };
   display: {
     rows: RowId[];          // display order; subset/reorder of the registry, never invents
     bars: boolean;
@@ -23,6 +29,9 @@ export interface StatuslineConfig {
     showContext: boolean;
     showGit: boolean;
     showSession: boolean;
+    burnAnchor: "session" | "block"; // $/hr anchor: session span (default) or zai 5h block
+    showVersions: boolean; // ambient SL/PI stamps (spec §15), default off
+    theme: string; // named preset (default/mono) — validated at use, unknown-row precedent
   };
 }
 
@@ -35,6 +44,7 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
   deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
+  providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   display: {
     rows: [...KNOWN_ROW_IDS],
     bars: true,
@@ -43,6 +53,9 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
     showContext: true,
     showGit: true,
     showSession: true,
+    burnAnchor: "session",
+    showVersions: false,
+    theme: "default",
   },
 };
 
@@ -92,6 +105,15 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.escalateMinutes === "number" && d.escalateMinutes > 0) cfg.deen.escalateMinutes = d.escalateMinutes;
   }
 
+  if (parsed.providers && typeof parsed.providers === "object") {
+    const p = parsed.providers as Record<string, unknown>;
+    if (p.openrouter && typeof p.openrouter === "object") {
+      const o = p.openrouter as Record<string, unknown>;
+      if (typeof o.enabled === "boolean") cfg.providers.openrouter.enabled = o.enabled;
+      if (typeof o.pollIntervalMs === "number" && o.pollIntervalMs > 0) cfg.providers.openrouter.pollIntervalMs = o.pollIntervalMs;
+    }
+  }
+
   if (parsed.display && typeof parsed.display === "object") {
     const d = parsed.display as Record<string, unknown>;
     if (typeof d.showTokens === "boolean") cfg.display.showTokens = d.showTokens;
@@ -100,6 +122,14 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.showSession === "boolean") cfg.display.showSession = d.showSession;
     if (typeof d.bars === "boolean") cfg.display.bars = d.bars;
     if (typeof d.sparkline === "boolean") cfg.display.sparkline = d.sparkline;
+    if (typeof d.showVersions === "boolean") cfg.display.showVersions = d.showVersions;
+    if (typeof d.theme === "string") cfg.display.theme = d.theme;
+    if (typeof d.burnAnchor === "string") {
+      if (d.burnAnchor !== "session" && d.burnAnchor !== "block") {
+        throw new Error('burnAnchor must be "session" or "block"');
+      }
+      cfg.display.burnAnchor = d.burnAnchor;
+    }
     if (Array.isArray(d.rows)) {
       const valid: RowId[] = [];
       for (const id of d.rows) {

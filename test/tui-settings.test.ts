@@ -50,3 +50,22 @@ test("deen subcommand parses city or auto; bare deen errors with usage", () => {
   assert.deepEqual(parseStatuslineArgs("deen auto"), { action: "set-deen-city", city: "auto" });
   assert.deepEqual(parseStatuslineArgs("deen"), { action: "error", message: "usage: /statusline deen <city|auto>" });
 });
+
+// ── v2 P3: rows subcommand ──
+
+test("rows: bare lists; comma list validates against KNOWN_ROW_IDS; invalid → error", () => {
+  assert.deepEqual(parseStatuslineArgs("rows"), { action: "list-rows" });
+  assert.deepEqual(
+    parseStatuslineArgs("rows identity, ctx ,money"),
+    { action: "set-rows", ids: ["identity", "ctx", "money"] },
+  );
+  // dedupe preserving first occurrence
+  assert.deepEqual(
+    parseStatuslineArgs("rows money,money,deen"),
+    { action: "set-rows", ids: ["money", "deen"] },
+  );
+  const bad = parseStatuslineArgs("rows identity,nope");
+  assert.equal(bad.action, "error");
+  assert.match(bad.message, /identity, ctx, money, quota, deen, ambient/);
+  assert.equal(parseStatuslineArgs("rows ,").action, "error"); // empty after trim
+});

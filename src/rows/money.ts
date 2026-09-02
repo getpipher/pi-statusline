@@ -25,9 +25,16 @@ export function createMoneyRow(): Row {
         }
       }
 
-      // Burn rate = session cost over active-session wall time; needs ≥2 usage entries.
+      // Burn rate: block-anchored (CC-style) when configured + window data exists;
+      // otherwise session cost over active-session wall time (needs ≥2 usage entries).
       if (detail >= 1) {
-        if (usage.count >= 2 && snapshot.session.spanMs > 0) {
+        const anchor = snapshot.config.display.burnAnchor ?? "session";
+        const win = snapshot.quotaWindow;
+        const elapsedMs = win ? snapshot.now - win.startMs : 0;
+        if (anchor === "block" && win && elapsedMs >= 60_000 && snapshot.now <= win.endMs) {
+          const perHour = win.cost / (elapsedMs / 3_600_000);
+          frags.push({ text: ` | $${formatMoney(perHour)}/hr`, color: "muted" });
+        } else if (usage.count >= 2 && snapshot.session.spanMs > 0) {
           const perHour = usage.cost / (snapshot.session.spanMs / 3_600_000);
           frags.push({ text: ` | $${formatMoney(perHour)}/hr`, color: "muted" });
         } else {

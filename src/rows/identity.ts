@@ -24,7 +24,18 @@ export function createIdentityRow(): Row {
         frags.push({ text: s.sessionName.trim(), color: "text" });
       }
       if (detail >= 2) frags.push({ text: `${frags.length > 0 ? " " : ""}${s.repoName}`, color: "dim" });
-      if (s.branch && detail >= 1) frags.push({ text: `${frags.length > 0 ? " " : ""}⎇ ${s.branch}`, color: "toolTitle" });
+      if (s.branch && detail >= 1) {
+        frags.push({ text: `${frags.length > 0 ? " " : ""}⎇ ${s.branch}`, color: "toolTitle" });
+        const g = snapshot.git;
+        if (g) {
+          if (g.dirty) frags.push({ text: "*", color: "toolTitle" });
+          const marks = [
+            g.ahead !== null && g.ahead > 0 ? `↑${g.ahead}` : null,
+            g.behind !== null && g.behind > 0 ? `↓${g.behind}` : null,
+          ].filter((m): m is string => m !== null);
+          if (marks.length > 0) frags.push({ text: ` ${marks.join(" ")}`, color: "toolTitle" });
+        }
+      }
       frags.push({ text: `${frags.length > 0 ? " | " : ""}${formatModelName(s.modelId)}`, color: "accent" });
       return frags;
     },

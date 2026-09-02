@@ -74,8 +74,9 @@ function makeHarness() {
   const footerData = {
     getGitBranch: () => "main",
     getExtensionStatuses: () => statuses,
-    onBranchChange: (_callback: () => void) => () => {},
+    onBranchChange: (callback: () => void) => { branchChangeCallback = callback; return () => {}; },
   };
+  let branchChangeCallback: (() => void) | null = null;
 
   const model = {
     provider: "zai",
@@ -123,6 +124,14 @@ function makeHarness() {
     on: (event: string, handler: Handler) => handlers.set(event, handler),
     registerCommand: (name: string, command: Command) => commands.set(name, command),
   };
+
+  // Controllable fake git source (Task 7): data set by the test, refreshes recorded.
+  const gitRefreshes: Array<boolean | undefined> = [];
+  let gitData: import("../src/git/source.ts").GitSnapshot | null = null;
+  const fakeGitSource = {
+    refresh: (force?: boolean) => { gitRefreshes.push(force); },
+    get: () => gitData,
+  };
   const pi = piObject as unknown as ExtensionAPI;
 
   let started = 0;
@@ -141,7 +150,13 @@ function makeHarness() {
   return {
     tmp, configPath, handlers, commands, colors, notifications, renderRequests: () => renderRequests,
     setFooterCalls: () => setFooterCalls, footerHolder, ctxObject, ctx, pi,
-    fakeZaiAdapter, counters: { get started() { return started; }, get stopped() { return stopped; }, get fetched() { return fetched; } },
+    fakeZaiAdapter, fakeGitSource,
+    git: {
+      set: (d: import("../src/git/source.ts").GitSnapshot | null) => { gitData = d; },
+      refreshes: () => [...gitRefreshes],
+      triggerBranchChange: () => branchChangeCallback?.(),
+    },
+    counters: { get started() { return started; }, get stopped() { return stopped; }, get fetched() { return fetched; } },
   };
 }
 
@@ -153,6 +168,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
     });
 
@@ -203,6 +219,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
           configPath: h2.configPath,
           ledgerPath: join(h2.tmp, "ledger.jsonl"),
           readKey: () => "fixture-key",
+          makeGitSource: () => h2.fakeGitSource,
           makeAdapters: () => [{ ...h2.fakeZaiAdapter, current: () => null }],
         });
         h2.handlers.get("session_start")?.({}, h2.ctx);
@@ -261,6 +278,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
           configPath: h3.configPath,
           ledgerPath: join(h3.tmp, "ledger.jsonl"),
           readKey: () => "fixture-key",
+          makeGitSource: () => h3.fakeGitSource,
           makeAdapters: () => [h3.fakeZaiAdapter],
         });
         h3.handlers.get("session_start")?.({}, h3.ctx);
@@ -327,6 +345,7 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
       deenCachePath: join(h.tmp, "deen-cache.json"),
       makeDeenSource: () => fakeDeen,
@@ -389,6 +408,7 @@ test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
       deenCachePath: join(h.tmp, "deen-cache.json"),
       makeDeenSource: () => fakeNull,
@@ -397,6 +417,318 @@ test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
     const lines = h.footerHolder.current!.render(500);
     assert.ok(lines.length >= 4, "other rows unaffected");
     assert.ok(!lines.some((l) => l.includes("Fajr") || l.includes("Rabīʿ")), "deen line absent when current() is null");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 wiring: burnAnchor "block" — $/hr from the zai 5h window + ledger.costSince ──
+
+test("v2 P3 wiring: burnAnchor block derives $/hr from quotaWindow cost", async () => {
+  const h = makeHarness();
+  try {
+    // Window: QUOTA.fiveHour.nextResetTime = (module-load) now + 1h → window ≈ [now−4h, now+1h].
+    // Put both usage entries inside that window (now−2h, now−1h) with cost 0.5 + 1.0.
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{
+      timestamp: string;
+      message: { usage: { cost: { total: number } } };
+    }>;
+    entries[0]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[0]!.message.usage.cost = { total: 0.5 };
+    entries[1]!.message.usage.cost = { total: 1.0 };
+
+    writeFileSync(h.configPath, JSON.stringify({ display: { burnAnchor: "block" } }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(h.footerHolder.current, "footer installed");
+    const moneyLine = h.footerHolder.current.render(500).find((l) => l.includes(" sess"));
+    assert.ok(moneyLine, "money line present");
+    // Block cost 1.5; elapsed = renderNow − (reset − 5h) = 4h + δ where δ = module-load→render
+    // drift (≪ 1s here) → perHour = 0.37499… → "$0.37/hr" — block-derived, NOT the
+    // session formula (session span ≈ 0 would render a huge $/hr). δ would need to
+    // exceed 394 s to flip the rounding — impossible for a single test run.
+    assert.match(moneyLine, /\$0\.37\/hr/, `block burn on money line: ${moneyLine}`);
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 wiring: GitSource — refresh triggers + snapshot passthrough to rows ──
+
+test("v2 P3 wiring: git source refreshes on session_start/branch change and feeds the rows", async () => {
+  const h = makeHarness();
+  try {
+    writeFileSync(h.configPath, JSON.stringify({}));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    // session_start forces a git refresh
+    assert.deepEqual(h.git.refreshes(), [true], "session_start → refresh(true)");
+
+    // no data yet → no git marks anywhere
+    const bare = h.footerHolder.current!.render(500).join("\n");
+    assert.ok(!bare.includes("*") || !bare.includes("⎇ main*"), "no marks before data");
+
+    // simulated data arrival → render picks up get() through the snapshot
+    h.git.set({ dirty: true, ahead: 2, behind: 1, commitsToday: 4 });
+    const flat = h.footerHolder.current!.render(500).join("\n");
+    assert.match(flat, /⎇ main\* ↑2 ↓1/, "identity marks from snapshot.git");
+    assert.match(flat, /\| commits 4/, "ambient commits-today from snapshot.git");
+
+    // branch change → forced refresh + repaint
+    const before = h.git.refreshes().length;
+    h.git.triggerBranchChange();
+    assert.deepEqual(h.git.refreshes().slice(before), [true], "onBranchChange → refresh(true)");
+    assert.ok(h.renderRequests() > 0, "onBranchChange still requests a render");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 wiring: makeAdapters receives the ledger getter (ensureLedger runs first) ──
+
+test("v2 P3 wiring: makeAdapters deps include a resolving ledger getter", async () => {
+  const h = makeHarness();
+  try {
+    let seen: import("../src/ledger/store.ts").LedgerStore | null | undefined;
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: (deps) => {
+        seen = deps.ledger();
+        return [h.fakeZaiAdapter];
+      },
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(seen, "ledger getter resolves to the live store (ensureLedger ran before makeAdapters)");
+    assert.equal(typeof seen!.providerTodayCost, "function", "store is the full LedgerStore (Task 1 queries present)");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 wiring: named theme presets — remap through theme.fg + one-time unknown notify ──
+
+test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", async () => {
+  // (a) mono: no success/toolTitle color names reach theme.fg; content unchanged
+  {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.configPath, JSON.stringify({ display: { theme: "mono" } }));
+      activateStatusline(h.pi, {
+        authJsonPath: join(h.tmp, "auth.json"),
+        configPath: h.configPath,
+        ledgerPath: join(h.tmp, "ledger.jsonl"),
+        readKey: () => "fixture-key",
+        makeGitSource: () => h.fakeGitSource,
+        makeAdapters: () => [h.fakeZaiAdapter],
+      });
+      h.handlers.get("session_start")?.({}, h.ctx);
+      h.colors.length = 0;
+      const flat = h.footerHolder.current!.render(500).join("\n");
+      const colorNames = new Set(h.colors.map((c) => c.color));
+      assert.ok(!colorNames.has("success"), `mono must flatten success, saw: ${[...colorNames]}`);
+      assert.ok(!colorNames.has("toolTitle"), `mono must flatten toolTitle, saw: ${[...colorNames]}`);
+      assert.ok(colorNames.has("text"), "flattened tokens land on text");
+      assert.match(flat, /⎇ main/, "content unchanged — only token remap");
+      assert.equal(h.notifications.filter((n) => n.message.includes("display.theme")).length, 0, "mono is known — no notify");
+    } finally {
+      h.footerHolder.current?.dispose();
+      rmSync(h.tmp, { recursive: true, force: true });
+    }
+  }
+  // (b) unknown theme: identity mapping + exactly ONE warning across two renders
+  {
+    const h = makeHarness();
+    try {
+      writeFileSync(h.configPath, JSON.stringify({ display: { theme: "nope" } }));
+      activateStatusline(h.pi, {
+        authJsonPath: join(h.tmp, "auth.json"),
+        configPath: h.configPath,
+        ledgerPath: join(h.tmp, "ledger.jsonl"),
+        readKey: () => "fixture-key",
+        makeGitSource: () => h.fakeGitSource,
+        makeAdapters: () => [h.fakeZaiAdapter],
+      });
+      h.handlers.get("session_start")?.({}, h.ctx);
+      h.colors.length = 0;
+      h.footerHolder.current!.render(500);
+      h.footerHolder.current!.render(500);
+      const warns = h.notifications.filter((n) => n.message.includes('unknown display.theme "nope"'));
+      assert.equal(warns.length, 1, "exactly one unknown-theme notify across two renders");
+      assert.ok(warns[0] && warns[0].level === "warning", "notify level is warning");
+      // identity fallback: hue tokens still reach theme.fg unchanged
+      assert.ok(new Set(h.colors.map((c) => c.color)).has("toolTitle"), "unknown theme → default identity mapping");
+    } finally {
+      h.footerHolder.current?.dispose();
+      rmSync(h.tmp, { recursive: true, force: true });
+    }
+  }
+});
+
+// ── v2 P3 wiring: /statusline rows — persist order + notify + re-render ──
+
+test("v2 P3 wiring: rows command persists display order and notifies", async () => {
+  const h = makeHarness();
+  try {
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    const command = h.commands.get("statusline");
+    assert.ok(command);
+
+    // list-rows: notify with current order + valid hint
+    await command.handler("rows", h.ctx);
+    const listed = h.notifications.filter((n) => n.message.startsWith("Rows:"));
+    assert.equal(listed.length, 1);
+    assert.match(listed[0]!.message, /identity, ctx, money, quota, deen, ambient/);
+    assert.match(listed[0]!.message, /\(valid: /);
+
+    // set-rows: persisted to the config file + notify + re-render
+    const before = h.renderRequests();
+    await command.handler("rows deen,identity", h.ctx);
+    const persisted = JSON.parse(readFileSync(h.configPath, "utf8")) as { display: { rows: string[] } };
+    assert.deepEqual(persisted.display.rows, ["deen", "identity"]);
+    assert.ok(h.notifications.some((n) => n.message === "Row order set: deen, identity"), "set-rows notify");
+    assert.ok(h.renderRequests() > before, "set-rows forces a re-render");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 integration sweep: the assembled footer across the whole P3 surface ──
+
+test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", async () => {
+  const h = makeHarness();
+  try {
+    // Entries inside the active 5h window (block burn needs ledger cost there).
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{
+      timestamp: string;
+      message: { usage: { cost: { total: number } } };
+    }>;
+    entries[0]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[0]!.message.usage.cost = { total: 0.5 };
+    entries[1]!.message.usage.cost = { total: 1.0 };
+
+    writeFileSync(h.configPath, JSON.stringify({
+      display: { showVersions: true, burnAnchor: "block", theme: "mono" },
+    }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    h.git.set({ dirty: true, ahead: 2, behind: 1, commitsToday: 4 });
+
+    h.colors.length = 0;
+    const lines = h.footerHolder.current!.render(500);
+    const flat = lines.join("\n");
+
+    // identity: branch + dirty mark + ahead/behind
+    assert.match(flat, /⎇ main\* ↑2 ↓1/, "git marks beside the branch");
+    // quota: est projection fragment rides the active provider's line
+    const quotaLine = lines.find((l) => l.includes("zai-quota-line"));
+    assert.ok(quotaLine, "quota line present");
+    assert.match(quotaLine, / \| est \d+(\.\d+)?k \(\d+%\)/, `est fragment: ${quotaLine}`);
+    // money: block-anchored burn (1.5 over ≈4h — see the Task 5 wiring test for the bounds)
+    const moneyLine = lines.find((l) => l.includes(" sess"));
+    assert.ok(moneyLine, "money line present");
+    assert.match(moneyLine, /\$0\.37\/hr/, `block burn: ${moneyLine}`);
+    // ambient: commits-today + version stamps
+    const ambientLine = lines.find((l) => l.includes("commits 4"));
+    assert.ok(ambientLine, "commits-today on ambient line");
+    assert.match(ambientLine, /SL:\d/, "SL stamp on the same line");
+    // mono: no hue tokens reach theme.fg; flattened tokens land on text
+    const colorNames = new Set(h.colors.map((c) => c.color));
+    assert.ok(!colorNames.has("success") && !colorNames.has("toolTitle"), `mono flattens hues, saw: ${[...colorNames]}`);
+    assert.ok(colorNames.has("text"), "flattened tokens land on text");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── Final-review fix: ledger provider/model attribution wired through ensureLedger ──
+
+test("final-fix: session attribution flows ctx → store → adapter (OR today fragment live)", async () => {
+  const h = makeHarness();
+  try {
+    type LedgerGetter = () => import("../src/ledger/store.ts").LedgerStore | null;
+    let injectedLedger: LedgerGetter | undefined;
+    // providerTodayCost scopes to TODAY's local-day bucket — timestamp the fixture
+    // entries into the current day (the same mutation the Task-5/11 wiring tests use).
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{ timestamp: string }>;
+    entries[0]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    const fakeOr: ProviderRowAdapter<Record<string, never>> = {
+      id: "openrouter",
+      matches: (p) => p === "openrouter",
+      current: () => ({}) as never,
+      fetch: async () => ({}) as never,
+      // Renders through the INJECTED ledger dep — the real store-to-row path.
+      render: (_d, _dim) => {
+        const l = injectedLedger?.() ?? null;
+        const today = l ? l.providerTodayCost("zai") : -1;
+        return `or-ledger $${today.toFixed(2)} today`;
+      },
+      start: () => {},
+      stop: () => {},
+    };
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: (deps) => {
+        injectedLedger = deps.ledger;
+        return [fakeOr];
+      },
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    const flat = h.footerHolder.current!.render(500).join("\n");
+    // harness fixture: provider zai, entries 0.25 + 0.75 → today = $1.00 via the REAL store
+    assert.match(flat, /or-ledger \$1\.00 today/, `ledger-derived today on the OR line: ${flat.split("\n").find((l) => l.includes("or-ledger"))}`);
+    // and the persisted line itself carries the attribution
+    const lines = readFileSync(join(h.tmp, "ledger.jsonl"), "utf8").trim().split("\n");
+    const last = JSON.parse(lines[lines.length - 1]!) as { provider: string; model: string };
+    assert.equal(last.provider, "zai", "ledger line records provider zai");
+    assert.equal(last.model, "glm-5.2", "ledger line records the live model id");
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });

@@ -1,5 +1,5 @@
 // src/adapters/zai.ts
-import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaResult } from "../quota/zai.ts";
+import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaPoller, type QuotaResult } from "../quota/zai.ts";
 import { formatTokenCount, formatReset, renderBar } from "../format.ts";
 import type { ProviderRowAdapter } from "./types.ts";
 
@@ -32,17 +32,17 @@ export function renderZaiQuota(data: QuotaResult, now: number): string {
 }
 
 export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<QuotaResult> {
-  let poller: ReturnType<typeof createQuotaPoller> | null = null;
+  let poller: QuotaPoller<QuotaResult> | null = null;
 
   function ensurePoller(): boolean {
     if (poller) return true;
     const apiKey = deps.readKey(deps.authJsonPath);
     if (!apiKey) return false; // key absent → adapter inert, row omitted
-    poller = createQuotaPoller({
+    poller = createQuotaPoller<QuotaResult>({
       apiKey,
       intervalMs: deps.pollIntervalMs(),
       onRefresh: deps.onRefresh,
-      ...(deps.fetchFn ? { fetchFn: deps.fetchFn } : {}),
+      fetchFn: deps.fetchFn ?? fetchQuota,
     });
     return true;
   }

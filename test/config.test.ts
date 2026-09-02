@@ -23,7 +23,8 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false, theme: "default" },
+    providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
 
@@ -69,6 +70,34 @@ test("loadConfig rejects invalid tier value", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({ zai: { tier: "invalid" } }));
   assert.throws(() => loadConfig(path), /tier must be/);
+});
+
+test("display.burnAnchor parses session|block, defaults session, throws on invalid", () => {
+  // default (file without display.burnAnchor)
+  const defPath = join(tmpDir, "default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.burnAnchor, "session");
+  // accepted value
+  const blockPath = join(tmpDir, "block.json");
+  writeFileSync(blockPath, JSON.stringify({ display: { burnAnchor: "block" } }));
+  assert.equal(loadConfig(blockPath).config.display.burnAnchor, "block");
+  // invalid throws — tier-throw precedent (strict enum via loadConfig)
+  const badPath = join(tmpDir, "bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { burnAnchor: "hourly" } }));
+  assert.throws(() => loadConfig(badPath), /burnAnchor must be "session" or "block"/);
+});
+
+test("display.showVersions lenient boolean, defaults false (showTokens precedent)", () => {
+  const defPath = join(tmpDir, "versions-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.showVersions, false);
+  const onPath = join(tmpDir, "versions-on.json");
+  writeFileSync(onPath, JSON.stringify({ display: { showVersions: true } }));
+  assert.equal(loadConfig(onPath).config.display.showVersions, true);
+  // non-boolean → ignored, default retained (lenient, showTokens pattern)
+  const badPath = join(tmpDir, "versions-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { showVersions: "yes" } }));
+  assert.equal(loadConfig(badPath).config.display.showVersions, false);
 });
 
 test("saveConfig writes valid JSON readable by loadConfig", () => {
@@ -147,4 +176,38 @@ test("v2.1: deen section parses; escalateMinutes guarded positive; city auto all
   writeFileSync(path, JSON.stringify({ deen: { city: "auto", country: "Singapore", method: "11", escalateMinutes: -5 } }));
   const { config } = loadConfig(path);
   assert.deepEqual(config.deen, { city: "auto", country: "Singapore", method: "11", escalateMinutes: 30 });
+});
+
+test("providers.openrouter: defaults enabled/600s; lenient parses (deen block precedent)", () => {
+  const defPath = join(tmpDir, "or-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.deepEqual(loadConfig(defPath).config.providers, { openrouter: { enabled: true, pollIntervalMs: 600_000 } });
+  const onPath = join(tmpDir, "or-on.json");
+  writeFileSync(onPath, JSON.stringify({ providers: { openrouter: { enabled: false, pollIntervalMs: 120_000 } } }));
+  const cfg = loadConfig(onPath).config;
+  assert.equal(cfg.providers.openrouter.enabled, false);
+  assert.equal(cfg.providers.openrouter.pollIntervalMs, 120_000);
+  // lenient: wrong types ignored, defaults retained
+  const badPath = join(tmpDir, "or-bad.json");
+  writeFileSync(badPath, JSON.stringify({ providers: { openrouter: { enabled: "yes", pollIntervalMs: -5 } } }));
+  const bad = loadConfig(badPath).config.providers.openrouter;
+  assert.equal(bad.enabled, true);
+  assert.equal(bad.pollIntervalMs, 600_000);
+});
+
+test("display.theme: defaults \"default\", lenient string passthrough (validated at use)", () => {
+  const defPath = join(tmpDir, "theme-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.theme, "default");
+  const monoPath = join(tmpDir, "theme-mono.json");
+  writeFileSync(monoPath, JSON.stringify({ display: { theme: "mono" } }));
+  assert.equal(loadConfig(monoPath).config.display.theme, "mono");
+  // stored verbatim even when unknown — validation happens at use (unknown-row precedent)
+  const oddPath = join(tmpDir, "theme-odd.json");
+  writeFileSync(oddPath, JSON.stringify({ display: { theme: "nope" } }));
+  assert.equal(loadConfig(oddPath).config.display.theme, "nope");
+  // non-string ignored, default retained
+  const badPath = join(tmpDir, "theme-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { theme: 5 } }));
+  assert.equal(loadConfig(badPath).config.display.theme, "default");
 });

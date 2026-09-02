@@ -190,3 +190,55 @@ test("repo attribution: lines record cwd basename; repoCost sums only the curren
   assert.deepEqual(store2.getSnapshot().repoCost, 1.24);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("attribute(): new lines record live provider/model; absent option stays unknown", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-attr-"));
+  const filePath = join(dir, "ledger.jsonl");
+  const store = createLedgerStore({
+    filePath, now: () => Date.UTC(2026, 7, 30, 10, 0), utcOffsetMinutes: SGT,
+    attribute: () => ({ provider: "openrouter", model: "claude-opus-4.6" }),
+  });
+  store.load();
+  store.reconcile([entry("at1", "2026-08-30T09:00:00.000Z", 0.25)]);
+  const raw = JSON.parse(readFileSync(filePath, "utf8").trim().split("\n")[0]!);
+  assert.equal(raw.provider, "openrouter");
+  assert.equal(raw.model, "claude-opus-4.6");
+  assert.equal(raw.repo, "unknown"); // repo option not passed here — orthogonal
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("costSince(ts) sums costs on/after the timestamp (burn-anchor query)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-since-"));
+  const filePath = join(dir, "ledger.jsonl");
+  const store = createLedgerStore({ filePath, now: () => Date.UTC(2026, 7, 30, 10, 0), utcOffsetMinutes: SGT });
+  store.load();
+  store.reconcile([
+    entry("s1", "2026-08-30T07:00:00.000Z", 0.5), // before blockStart
+    entry("s2", "2026-08-30T08:00:00.000Z", 0.25), // at blockStart (inclusive)
+    entry("s3", "2026-08-30T09:30:00.000Z", 1.0),
+  ]);
+  assert.equal(store.costSince(Date.parse("2026-08-30T08:00:00.000Z")), 1.25);
+  assert.equal(store.costSince(Date.parse("2026-08-30T07:00:00.001Z")), 1.25); // strictly-before excluded
+  assert.equal(store.costSince(Number.MAX_SAFE_INTEGER), 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("providerTodayCost / providerTodayTopModel scope by provider + today (store clock)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-prov-"));
+  const filePath = join(dir, "ledger.jsonl");
+  const store = createLedgerStore({
+    filePath, now: () => Date.UTC(2026, 7, 30, 10, 0), utcOffsetMinutes: SGT,
+    attribute: () => ({ provider: "openrouter", model: "claude-opus-4.6" }),
+  });
+  store.load();
+  store.reconcile([
+    entry("p1", "2026-08-30T02:00:00.000Z", 0.9),  // today SGT (10:00), openrouter
+    entry("p2", "2026-08-30T03:00:00.000Z", 0.4),  // today, same model
+    entry("p3", "2026-08-29T03:00:00.000Z", 5.0),  // yesterday — excluded
+  ]);
+  assert.equal(store.providerTodayCost("openrouter"), 1.3);
+  assert.equal(store.providerTodayCost("zai"), 0);
+  assert.deepEqual(store.providerTodayTopModel("openrouter"), { model: "claude-opus-4.6", cost: 1.3 });
+  assert.equal(store.providerTodayTopModel("zai"), null);
+  rmSync(dir, { recursive: true, force: true });
+});

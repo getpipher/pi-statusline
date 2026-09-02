@@ -8,7 +8,9 @@ import { readZaiKey } from "./quota/zai.ts";
 import { createSessionStore, type SessionStore } from "./session/store.ts";
 import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
-import type { ProviderRowAdapter } from "./adapters/types.ts";
+import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
+import { resolveQuotaAdapter, type ProviderRowAdapter } from "./adapters/types.ts";
+import { KNOWN_ROW_IDS } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createContextRow } from "./rows/context.ts";
@@ -17,7 +19,11 @@ import { createQuotaRow } from "./rows/quota.ts";
 import { createAmbientRow } from "./rows/ambient.ts";
 import { createDeenRow } from "./rows/deen.ts";
 import { createDeenSource, type DeenSource } from "./deen/source.ts";
+import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
+import { selfVersion, piVersion } from "./versions.ts";
+import { applyThemeColor, THEME_PRESETS } from "./theme.ts";
+import { FIVE_HOUR_MS } from "./quota/project.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -31,8 +37,10 @@ export interface StatuslineRuntimeDependencies {
   ledgerPath: string;
   deenCachePath: string;
   readKey: typeof readZaiKey;
-  makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
+  makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void; ledger: () => LedgerStore | null }) => ProviderRowAdapter<any>[];
   makeDeenSource: (deps: { cachePath: string; config: () => StatuslineConfig }) => DeenSource;
+  makeGitSource: (deps: { onUpdate: () => void }) => GitSource;
+  readVersions: () => { sl: string; pi: string | null };
 }
 
 const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
@@ -41,10 +49,26 @@ const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
   ledgerPath: LEDGER_PATH,
   deenCachePath: DEEN_CACHE_PATH,
   readKey: readZaiKey,
-  makeAdapters: ({ authJsonPath, readKey, config, onRefresh }) => [
-    createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
-  ],
+  makeAdapters: ({ authJsonPath, readKey, config, onRefresh, ledger }) => {
+    const adapters: ProviderRowAdapter<any>[] = [
+      createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
+    ];
+    if (config().providers.openrouter.enabled) {
+      adapters.push(createOpenRouterAdapter({
+        authJsonPath,
+        readKey: (p) => readOrKey(p), // zai-shaped dep field; OR reads its own key
+        pollIntervalMs: () => config().providers.openrouter.pollIntervalMs,
+        ledger,
+        onRefresh,
+      }));
+    }
+    return adapters;
+  },
   makeDeenSource: ({ cachePath, config }) => createDeenSource({ cachePath, config: () => config().deen }),
+  // onUpdate threaded in (not closed over) — requestRenderFn lives inside
+  // activateStatusline; makeAdapters/makeDeenSource follow the same deps-arg pattern.
+  makeGitSource: ({ onUpdate }) => createGitSource({ onUpdate }),
+  readVersions: () => ({ sl: selfVersion(), pi: piVersion() }),
 };
 
 export function activateStatusline(
@@ -65,6 +89,9 @@ export function activateStatusline(
   let ticker: Ticker | null = null;
   let requestRenderFn: (() => void) | null = null;
   let footerInstalled = false;
+  // Parallel to pendingRowWarnings/notifiedRowWarnings: theme validity is checked at
+  // use (per render) but the unknown-theme notify fires at most once per activation.
+  let notifiedThemeWarning = false;
 
   // DeenSource lives for the whole activateStatusline lifetime — ONE source, never
   // recreated on session reinstall (its in-memory last-good state must survive).
@@ -73,6 +100,10 @@ export function activateStatusline(
     config: () => config,
   });
   let lastDeenRefresh = 0;
+  // GitSource mirrors the deen lifecycle: one source per activation, async refresh,
+  // rows read get() synchronously per render (null-tolerant: a failed re-probe
+  // degrades the rows to no marks — accepted P3-5 behavior).
+  const gitSource = dependencies.makeGitSource({ onUpdate: () => requestRenderFn?.() });
   // Cheap throttle: the 30s ticker must not hammer the API (refresh is cache-first,
   // but a no-op call is still a disk read + freshness check).
   const deenNeedsRefresh = (): boolean => Date.now() - lastDeenRefresh > 60_000;
@@ -89,12 +120,14 @@ export function activateStatusline(
   };
 
   function buildAdapters(): void {
+    ensureLedger(); // BEFORE makeAdapters — the OR adapter's ledger getter must resolve
     for (const a of adapters) a.stop();
     adapters = dependencies.makeAdapters({
       authJsonPath: dependencies.authJsonPath,
       readKey: dependencies.readKey,
       config: () => config,
       onRefresh: () => requestRenderFn?.(),
+      ledger: () => ledgerStore,
     });
     registry = createRowRegistry([
       createIdentityRow(),
@@ -112,7 +145,22 @@ export function activateStatusline(
       // Task-6 wiring tail: attribute lines with the current repo so the REPO all-time
       // total renders. pi launches in the project dir — basename(cwd) matches
       // SessionStore's repoName default (identity-row consistency).
-      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath, repo: () => basename(process.cwd()) });
+      // Final-review fix: live session attribution — without this every line records
+      // "unknown" and the OpenRouter row's today/top fragments can never render.
+      // Defensive (repo accessor precedent): a throwing accessor must not crash
+      // reconcile-on-render — degrade to unknown.
+      ledgerStore = createLedgerStore({
+        filePath: dependencies.ledgerPath,
+        repo: () => basename(process.cwd()),
+        attribute: () => {
+          try {
+            const s = sessionStore.getSnapshot();
+            return { provider: s.provider ?? "unknown", model: s.modelId ?? "unknown" };
+          } catch {
+            return { provider: "unknown", model: "unknown" };
+          }
+        },
+      });
       ledgerStore.load();
     }
     return ledgerStore;
@@ -127,6 +175,7 @@ export function activateStatusline(
           ensureLedger().reconcile(sessionCtx.sessionManager.getEntries());
         }
         if (deenNeedsRefresh()) refreshDeen();
+        gitSource.refresh(); // TTL-guarded internally
         requestRenderFn?.();
       },
     });
@@ -152,7 +201,10 @@ export function activateStatusline(
     if (footerInstalled) return;
     ctx.ui.setFooter((tui, theme, footerData) => {
       requestRenderFn = () => tui.requestRender();
-      const unsub = footerData.onBranchChange(() => tui.requestRender());
+      const unsub = footerData.onBranchChange(() => {
+        gitSource.refresh(true);
+        tui.requestRender();
+      });
 
       return {
         dispose: () => {
@@ -172,6 +224,16 @@ export function activateStatusline(
           sessionStore.update(ctx, branch);
           const ledger = ensureLedger();
           ledger.reconcile(ctx.sessionManager.getEntries());
+          // Active 5h window (block burn anchor + est context): resolve like the quota
+          // row does, read fiveHour.nextResetTime defensively (adapters are any-typed).
+          let quotaWindow: RowSnapshot["quotaWindow"] = null;
+          const winner = resolveQuotaAdapter(adapters, sessionStore.getSnapshot().provider);
+          const winData = winner?.current() as { fiveHour?: { nextResetTime?: number } } | null | undefined;
+          const reset = winData?.fiveHour?.nextResetTime;
+          if (typeof reset === "number" && Number.isFinite(reset) && reset > Date.now()) {
+            const startMs = reset - FIVE_HOUR_MS;
+            quotaWindow = { startMs, endMs: reset, cost: ledger.costSince(startMs) };
+          }
           const snapshot: RowSnapshot = {
             now: Date.now(),
             width,
@@ -180,10 +242,21 @@ export function activateStatusline(
             statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
             deen: deenSource.current(),
+            git: gitSource.get(),
+            quotaWindow,
+            versions: dependencies.readVersions(),
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
-          // One theme pass: fragment colors → theme.fg; fragments own all spacing.
-          return lines.map((frags) => frags.map((f) => theme.fg(f.color, f.text)).join(""));
+          // Theme validation at use (mirrors unknown-row handling): one-time notify.
+          const themeName = config.display.theme;
+          if (!(themeName in THEME_PRESETS) && !notifiedThemeWarning) {
+            notifiedThemeWarning = true;
+            sessionCtx?.ui.notify(`pi-statusline: unknown display.theme "${themeName}" — using default (valid: ${Object.keys(THEME_PRESETS).join(", ")})`, "warning");
+          }
+          // One theme pass: fragment colors → preset remap → theme.fg; fragments own all spacing.
+          return lines.map((frags) =>
+            frags.map((f) => theme.fg(applyThemeColor(f.color, themeName).color, f.text)).join("")
+          );
         },
       };
     });
@@ -212,12 +285,18 @@ export function activateStatusline(
     sessionCtx = ctx;
     if (config.enabled) {
       sessionStore = createSessionStore(); // fresh span per session
+      // Attribution ordering: capture ctx.model (provider/modelId) BEFORE the first
+      // reconcile — lines persist once (idempotent seen-set), so a provider-less
+      // first write would freeze "unknown" onto them. Render's update() refreshes
+      // branch/usage afterwards.
+      sessionStore.update(ctx, null);
       ensureLedger().reconcile(ctx.sessionManager.getEntries());
       buildAdapters();
       installFooter(ctx);
       drainRowWarnings();
       startTicker();
       refreshDeen(); // async, off the render path — print-mode safe (no new timers)
+      gitSource.refresh(true); // forced: branch switched — state may differ immediately
     }
   });
 
@@ -227,12 +306,12 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>)",
+    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
         case "open-panel":
-          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>", "info");
+          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>", "info");
           break;
         case "refresh": {
           if (adapters.length === 0) {
@@ -276,6 +355,15 @@ export function activateStatusline(
           requestRenderFn?.();
           break;
         }
+        case "list-rows":
+          ctx.ui.notify(`Rows: ${config.display.rows.join(", ")} (valid: ${KNOWN_ROW_IDS.join(", ")})`, "info");
+          break;
+        case "set-rows":
+          config = { ...config, display: { ...config.display, rows: action.ids } };
+          saveConfig(dependencies.configPath, config);
+          ctx.ui.notify(`Row order set: ${action.ids.join(", ")}`, "info");
+          requestRenderFn?.();
+          break;
         case "error":
           ctx.ui.notify(action.message, "error");
           break;

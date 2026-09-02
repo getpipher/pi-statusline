@@ -30,6 +30,9 @@ export interface LedgerStoreOpts {
   now?: () => number;
   utcOffsetMinutes?: number; // fixed-offset day boundary; default = host local offset
   repo?: () => string; // current repo name (cwd basename); absent → lines record "unknown", repoCost 0
+  // Live session attribution (pi exposes provider/model at session level, not per
+  // entry). Absent → "unknown" for both (legacy lines never re-attributed).
+  attribute?: () => { provider: string; model: string };
   warn?: (message: string) => void;
 }
 
@@ -37,6 +40,9 @@ export interface LedgerStore {
   load(): void; // startup scan → seen-set + in-memory lines
   reconcile(entries: SessionEntry[]): number; // append unseen usage entries → count appended
   getSnapshot(): LedgerSnapshot;
+  costSince(ts: number): number;
+  providerTodayCost(provider: string): number;
+  providerTodayTopModel(provider: string): { model: string; cost: number } | null;
 }
 
 // Fixed-offset calendar-day bucket: days since epoch in the shifted frame.
@@ -71,6 +77,7 @@ function parseLine(raw: string): LedgerLine | null {
 export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
   const now = opts.now ?? Date.now;
   const offset = opts.utcOffsetMinutes ?? -new Date().getTimezoneOffset();
+  const attribute = opts.attribute ?? (() => ({ provider: "unknown", model: "unknown" }));
   const seen = new Set<string>();
   const lines: LedgerLine[] = [];
   let loaded = false;
@@ -104,9 +111,9 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
     return {
       id: entry.id,
       ts,
-      // P1 records "unknown" for both — pi usage entries carry no per-entry attribution.
-      provider: "unknown",
-      model: "unknown",
+      // P1 recorded "unknown" for both; P3 wires live session attribution (opts.attribute).
+      provider: attribute().provider,
+      model: attribute().model,
       repo: opts.repo?.() ?? "unknown",
       input: u.input ?? 0,
       output: u.output ?? 0,
@@ -190,6 +197,36 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
         daily,
         repoCost,
       };
+    },
+
+    costSince(ts: number): number {
+      let sum = 0;
+      for (const l of lines) if (l.ts >= ts) sum += l.cost;
+      return sum;
+    },
+
+    providerTodayCost(provider: string): number {
+      const todayIdx = localDayIndex(now(), offset);
+      let sum = 0;
+      for (const l of lines) {
+        if (l.provider !== provider || localDayIndex(l.ts, offset) !== todayIdx) continue;
+        sum += l.cost;
+      }
+      return sum;
+    },
+
+    providerTodayTopModel(provider: string): { model: string; cost: number } | null {
+      const todayIdx = localDayIndex(now(), offset);
+      const byModel = new Map<string, number>();
+      for (const l of lines) {
+        if (l.provider !== provider || localDayIndex(l.ts, offset) !== todayIdx) continue;
+        byModel.set(l.model, (byModel.get(l.model) ?? 0) + l.cost);
+      }
+      let top: { model: string; cost: number } | null = null;
+      for (const [model, cost] of byModel) {
+        if (!top || cost > top.cost) top = { model, cost };
+      }
+      return top;
     },
   };
 }

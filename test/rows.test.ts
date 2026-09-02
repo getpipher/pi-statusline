@@ -16,6 +16,9 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     statuses: "",
     config: DEFAULT_CONFIG,
     deen: null,
+    git: null,
+    quotaWindow: null,
+    versions: { sl: "0.4.0", pi: "0.84.4" },
     ...partial,
   };
 }
@@ -244,4 +247,161 @@ test("money row: REPO all-time total leads the row in bright text", () => {
   }), 2)!;
   assert.deepEqual(frags[0], { text: "REPO $11529.35", color: "text" });
   assert.deepEqual(frags[1], { text: " | $1.24 sess", color: "text" });
+});
+
+// ── Task 4: quota row est fragment ──
+import { createQuotaRow } from "../src/rows/quota.ts";
+import type { ProviderRowAdapter } from "../src/adapters/types.ts";
+import type { QuotaResult } from "../src/quota/zai.ts";
+
+const QUOTA_DATA: QuotaResult = {
+  tier: "lite",
+  fiveHour: {
+    unit: 3, number: 5, usage: 2000, currentValue: 1500, remaining: 500,
+    percentage: 75,
+    nextResetTime: Date.UTC(2026, 7, 30, 12, 0),
+  },
+  weekly: null,
+  fetchedAt: Date.UTC(2026, 7, 30, 10, 0),
+};
+
+// Projection math (projectBlock, Task 3): start = reset − 5h = 07:00Z; at NOW 08:00Z
+// elapsed = 1h (≥ 60s gate), remaining = 4h, usage 2000 > 0 → rate 1500/h →
+// projected 1500 + 1500×4 = 7500 → "7.5k", percent round(7500/2000×100) = 375.
+// (The brief's "4.5k (225%)" mixed a 1h elapsed with a 2h remaining — impossible
+// for reset 12:00 / NOW 08:00. Numbers re-derived from projectBlock's code.)
+const NOW = Date.UTC(2026, 7, 30, 8, 0);
+
+function fakeAdapter(renderText = "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h"): ProviderRowAdapter<QuotaResult> {
+  return {
+    id: "zai",
+    matches: (p) => p === "zai",
+    current: () => QUOTA_DATA,
+    fetch: async () => QUOTA_DATA,
+    render: () => renderText,
+    // heat: percentage 75 → "warning" (≥70 band); without heat() the row renders
+    // neutral "muted", so the fake must expose it to pin the adapter-fragment color.
+    heat: (d) => d.fiveHour?.percentage ?? null,
+    start: () => {},
+    stop: () => {},
+  };
+}
+
+test("quota row detail 2: est fragment appended (projected units + %)", () => {
+  const row = createQuotaRow([fakeAdapter()]);
+  const frags = row.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 2)!;
+  assert.deepEqual(frags, [
+    { text: "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h", color: "warning" },
+    { text: " | est 7.5k (375%)", color: "text" },
+  ]);
+});
+
+test("quota row detail 1: est dropped, adapter string only (shrink-before-drop contract)", () => {
+  const row = createQuotaRow([fakeAdapter()]);
+  const frags = row.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 1)!;
+  assert.deepEqual(frags, [{ text: "zai ▕███████░░░▏ 75% 1.5k/2.0k 5h", color: "warning" }]);
+});
+
+test("quota row est omitted for dim (inactive) provider and when projection is null", () => {
+  const row = createQuotaRow([fakeAdapter()]);
+  // inactive provider → dim → no est
+  const dimFrags = row.render(snap({ now: NOW, session: session({ provider: "anthropic" }) }), 2)!;
+  assert.equal(dimFrags.length, 1);
+  // projection null (weekly-only data) → no est
+  const noFiveHour = createQuotaRow([{
+    ...fakeAdapter(),
+    current: () => ({ ...QUOTA_DATA, fiveHour: null }),
+  }]);
+  const frags = noFiveHour.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 2)!;
+  assert.equal(frags.length, 1);
+});
+
+// ── Task 5: burn anchor ──
+const BURN_BLOCK = { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, burnAnchor: "block" as const } };
+const BURN_SESSION_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 99, count: 5 };
+
+test("money row block anchor: $/hr from quotaWindow cost over block elapsed", () => {
+  const s = snap({
+    now: Date.UTC(2026, 7, 30, 9, 0),
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 60_000 }),
+  });
+  const frags = createMoneyRow().render(s, 1)!;
+  assert.ok(frags.some((f) => f.text === " | $1.50/hr"), `expected block burn, got: ${frags.map((f) => f.text).join("")}`); // 3.0 over 2h
+});
+
+test("money row block anchor falls back to session when window missing/young/stale", () => {
+  // quotaWindow null → session formula (99 cost over 1h span)
+  const s1 = snap({
+    ledger: LEDGER,
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+  });
+  assert.ok(createMoneyRow().render(s1, 1)!.some((f) => f.text === " | $99.00/hr"));
+  // elapsed < 60s → session fallback too
+  const s2 = snap({
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 8, 59, 30), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+    now: Date.UTC(2026, 7, 30, 9, 0),
+  });
+  assert.ok(createMoneyRow().render(s2, 1)!.some((f) => f.text === " | $99.00/hr"));
+  // now past endMs (stale window) → session fallback too — covers the now ≤ endMs guard
+  const s3 = snap({
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 9, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+    now: Date.UTC(2026, 7, 30, 9, 30),
+  });
+  assert.ok(createMoneyRow().render(s3, 1)!.some((f) => f.text === " | $99.00/hr"));
+});
+
+// ── Task 6: version stamps ──
+
+test("ambient versions fragment: gated by showVersions + detail 2; PI omitted when null", () => {
+  const row = createAmbientRow();
+  const cfg = { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, showVersions: true } };
+  const on = row.render(snap({ config: cfg, session: session({}) }), 2)!;
+  assert.deepEqual(on.slice(-2), [
+    { text: " | SL:0.4.0", color: "dim" },
+    { text: " · PI:0.84.4", color: "dim" },
+  ]);
+  const noPi = row.render(snap({ config: cfg, session: session({}), versions: { sl: "0.4.0", pi: null } }), 2)!;
+  assert.deepEqual(noPi.slice(-1), [{ text: " | SL:0.4.0", color: "dim" }]);
+  // off by default
+  const off = row.render(snap({ session: session({}) }), 2)!;
+  assert.ok(!off.some((f) => f.text.includes("SL:")));
+  // detail 1 → omitted (periphery, same gate as statuses)
+  const d1 = row.render(snap({ config: cfg, session: session({}) }), 1)!;
+  assert.ok(!d1.some((f) => f.text.includes("SL:")));
+});
+
+// ── Task 7: git wiring ──
+
+test("identity row: dirty * and ahead/behind ride the branch fragment (detail >= 1 only)", () => {
+  const row = createIdentityRow();
+  const g = { dirty: true, ahead: 2, behind: 1, commitsToday: 4 };
+  const frags = row.render(snap({ session: session({ branch: "main" }), git: g }), 2)!;
+  assert.deepEqual(frags[2], { text: " ⎇ main", color: "toolTitle" });
+  assert.deepEqual(frags[3], { text: "*", color: "toolTitle" });
+  assert.deepEqual(frags[4], { text: " ↑2 ↓1", color: "toolTitle" });
+  // clean + no upstream → no extra fragments (model follows the branch directly)
+  const clean = row.render(snap({ session: session({ branch: "main" }), git: { dirty: false, ahead: null, behind: null, commitsToday: 0 } }), 2)!;
+  assert.deepEqual(clean[3], { text: " | glm-5.2", color: "accent" });
+  assert.equal(clean.length, 4);
+  // detail 1 with branch → marks still render; detail 0 (no branch) → none
+  assert.ok(row.render(snap({ session: session({ branch: "main" }), git: g }), 1)!.some((f) => f.text === "*"));
+  assert.ok(!row.render(snap({ session: session({ branch: "main" }), git: g }), 0)!.some((f) => f.text === "*"));
+});
+
+test("ambient row: commits-today fragment at detail >= 1, dim", () => {
+  const row = createAmbientRow();
+  const frags = row.render(snap({ session: session({}), git: { dirty: false, ahead: null, behind: null, commitsToday: 4 } }), 1)!;
+  assert.ok(frags.some((f) => f.text === " | commits 4" && f.color === "dim"));
+  const none = row.render(snap({ session: session({}), git: { dirty: false, ahead: null, behind: null, commitsToday: null } }), 1)!;
+  assert.ok(!none.some((f) => f.text.includes("commits")));
 });
