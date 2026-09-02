@@ -22,7 +22,7 @@ import { createDeenSource, type DeenSource } from "./deen/source.ts";
 import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
-import { applyThemeColor, THEME_PRESETS, DEFAULT_THEME_NAME } from "./theme.ts";
+import { resolveThemeToken, THEME_PRESETS } from "./theme.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -248,21 +248,18 @@ export function activateStatusline(
             notifiedThemeWarning = true;
             sessionCtx?.ui.notify(`pi-statusline: unknown display.theme "${themeName}" — using default (valid: ${Object.keys(THEME_PRESETS).join(", ")})`, "warning");
           }
-          // Theme pass: fragment colors → preset remap → theme.fg (or truecolor ANSI for hex presets).
-          const preset = THEME_PRESETS[themeName];
-          const useHex = preset != null && themeName !== DEFAULT_THEME_NAME;
+          // Theme pass: fragment colors → preset resolution → truecolor ANSI (hex presets)
+          // or theme.fg (token results — default identity, mono remap).
           return lines.map((frags) =>
             frags.map((f) => {
-              if (useHex) {
-                const resolved = preset.tokens[f.color];
-                if (typeof resolved === "string" && resolved.startsWith("#")) {
-                  const { r, g, b } = hexToRgb(resolved);
-                  return `\x1b[38;2;${r};${g};${b}m${f.text}\x1b[0m`;
-                }
+              const resolved = resolveThemeToken(f.color, themeName);
+              if (resolved.startsWith("#")) {
+                const { r, g, b } = hexToRgb(resolved);
+                return `\x1b[38;2;${r};${g};${b}m${f.text}\x1b[0m`;
               }
-              // Non-hex preset (default/mono): remap the token, let pi's theme resolve it.
-              // The value here is provably a token (hex path returned above), not a hex string.
-              return theme.fg(applyThemeColor(f.color, themeName).color as ColorToken, f.text);
+              // Token result (default identity / mono remap / unknown-theme identity):
+              // provably not a hex string here, so the ThemeColor cast is sound.
+              return theme.fg(resolved as ColorToken, f.text);
             }).join("")
           );
         },
