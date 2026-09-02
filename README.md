@@ -14,7 +14,7 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 ```
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
 ctx 34% 68k/200k | ↑48k ↓6.2k | cache 68%
-REPO $12.34 | $1.24 sess | $8.40 day | $31.20 7d | $118.75 30d ▁▁▂▄▂▁▇ | $0.39/hr
+REPO $12.34 | $1.24 sess | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75 ▁▁▂▄▂▁▇ | $0.39/hr
 zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
 04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4

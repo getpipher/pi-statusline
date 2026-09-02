@@ -15,10 +15,10 @@ export function createMoneyRow(): Row {
       if (detail >= 1 && ledger.repoCost > 0) frags.push({ text: `REPO $${formatMoney(ledger.repoCost)}`, color: "text" });
       // Session cost is pi-native real data (D4) — works for every provider.
       frags.push({ text: `${frags.length ? " | " : ""}$${formatMoney(usage.cost)} sess`, color: "text" });
-      if (detail >= 1) frags.push({ text: ` | $${formatMoney(ledger.todayCost)} day`, color: "success" });
+      if (detail >= 1) frags.push({ text: ` | DAY $${formatMoney(ledger.todayCost)}`, color: "success" });
       if (detail >= 2) {
-        frags.push({ text: ` | $${formatMoney(ledger.last7Cost)} 7d`, color: "success" });
-        frags.push({ text: ` | $${formatMoney(ledger.last30Cost)} 30d`, color: "success" });
+        frags.push({ text: ` | 7DAY $${formatMoney(ledger.last7Cost)}`, color: "success" });
+        frags.push({ text: ` | 30DAY $${formatMoney(ledger.last30Cost)}`, color: "success" });
         if (snapshot.config.display.sparkline) {
           const spark = renderSparkline(ledger.daily);
           if (spark) frags.push({ text: ` ${spark}`, color: "success" });
