@@ -68,6 +68,29 @@ test("update+getSnapshot exposes identity, usage, context and span", () => {
   assert.equal(snap.spanMs, 2 * 3_600_000 + 12 * 60_000);
 });
 
+test("update captures thinking level from ctx.getThinkingLevel (v0.4.6, FB6)", () => {
+  const store = createSessionStore({ now: () => NOW, cwd: () => "/tmp/proj" });
+  store.update(
+    makeCtx({ getThinkingLevel: () => "high" }),
+    null,
+  );
+  assert.equal(store.getSnapshot().thinkingLevel, "high");
+  // a later change re-reads on the next update (render loop calls update per render)
+  store.update(
+    makeCtx({ getThinkingLevel: () => "off" }),
+    null,
+  );
+  assert.equal(store.getSnapshot().thinkingLevel, "off");
+});
+
+test("thinkingLevel defaults to \"off\" when ctx lacks the accessor (fake/older hosts)", () => {
+  const store = createSessionStore({ now: () => NOW, cwd: () => "/tmp/proj" });
+  const ctx = makeCtx();
+  delete (ctx as Record<string, unknown>).getThinkingLevel;
+  store.update(ctx, null);
+  assert.equal(store.getSnapshot().thinkingLevel, "off");
+});
+
 test("span falls back to store creation time when there are no entries", () => {
   const store = createSessionStore({ now: () => NOW, cwd: () => "/tmp/proj" });
   store.update(

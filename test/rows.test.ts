@@ -33,6 +33,7 @@ function session(partial: Partial<SessionSnapshot>): SessionSnapshot {
     contextTokens: null,
     contextWindow: 0,
     contextPercent: null,
+    thinkingLevel: "off",
     spanMs: (3 * 60 + 12) * 60_000,
     ...partial,
   };
@@ -44,23 +45,33 @@ function plain(frags: ReturnType<Row["render"]>): string {
 
 test("identity row: session name bright lead, repo dim, branch mid with ⎇, model accent", () => {
   const row = createIdentityRow();
-  const frags = row.render(snap({ session: session({}) }), 2)!;
+  const frags = row.render(snap({ session: session({ thinkingLevel: "high" }) }), 2)!;
   assert.deepEqual(frags, [
     { text: "v2-p1", color: "text" },
     { text: " pi-statusline", color: "dim" },
     { text: " ⎇ main", color: "toolTitle" },
     { text: " | glm-5.2", color: "accent" },
+    { text: " · high", color: "dim" },
   ]);
 });
 
 test("identity row: detail 1 drops repo; detail 0 keeps name + model only", () => {
   const row = createIdentityRow();
   const one = plain(row.render(snap({ session: session({}) }), 1)!);
-  assert.equal(one, "v2-p1 ⎇ main | glm-5.2");
+  assert.equal(one, "v2-p1 ⎇ main | glm-5.2 · off");
   const zero = plain(row.render(snap({ session: session({}) }), 0)!);
   assert.equal(zero, "v2-p1 | glm-5.2");
   const noNameZero = plain(row.render(snap({ session: session({ sessionName: undefined }) }), 0)!);
   assert.equal(noNameZero, "glm-5.2", "unset name → bare model at detail 0 (no orphan separator)");
+});
+
+test("identity row: thinking level is a detail>=1 shrink casualty; off renders dim", () => {
+  const row = createIdentityRow();
+  const high = session({ thinkingLevel: "high" });
+  const zero = plain(row.render(snap({ session: high }), 0)!);
+  assert.ok(!zero.includes("high"), "detail 0 drops the level");
+  const off = plain(row.render(snap({ session: session({ thinkingLevel: "off" }) }), 2)!);
+  assert.ok(off.includes(" · off"), `off renders: ${off}`);
 });
 
 test("identity row: strips provider prefix and variant from model id", () => {
@@ -71,10 +82,10 @@ test("identity row: strips provider prefix and variant from model id", () => {
 
 test("identity row: omits name when unset or showSession=false; omits branch when null", () => {
   const row = createIdentityRow();
-  assert.equal(plain(row.render(snap({ session: session({ sessionName: undefined }) }), 2)), "pi-statusline ⎇ main | glm-5.2");
+  assert.equal(plain(row.render(snap({ session: session({ sessionName: undefined }) }), 2)), "pi-statusline ⎇ main | glm-5.2 · off");
   const noSession = snap({ session: session({}), config: { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, showSession: false } } });
-  assert.equal(plain(row.render(noSession, 2)), "pi-statusline ⎇ main | glm-5.2");
-  assert.equal(plain(row.render(snap({ session: session({ branch: null }) }), 2)), "v2-p1 pi-statusline | glm-5.2");
+  assert.equal(plain(row.render(noSession, 2)), "pi-statusline ⎇ main | glm-5.2 · off");
+  assert.equal(plain(row.render(snap({ session: session({ branch: null }) }), 2)), "v2-p1 pi-statusline | glm-5.2 · off");
 });
 
 const DEEN = {
@@ -321,10 +332,11 @@ test("identity row: dirty * and ahead/behind ride the branch fragment (detail >=
   assert.deepEqual(frags[2], { text: " ⎇ main", color: "toolTitle" });
   assert.deepEqual(frags[3], { text: "*", color: "toolTitle" });
   assert.deepEqual(frags[4], { text: " ↑2 ↓1", color: "toolTitle" });
-  // clean + no upstream → no extra fragments (model follows the branch directly)
+  // clean + no upstream → no extra fragments (model + thinking level follow the branch)
   const clean = row.render(snap({ session: session({ branch: "main" }), git: { dirty: false, ahead: null, behind: null, commitsToday: 0 } }), 2)!;
   assert.deepEqual(clean[3], { text: " | glm-5.2", color: "accent" });
-  assert.equal(clean.length, 4);
+  assert.deepEqual(clean[4], { text: " · off", color: "dim" });
+  assert.equal(clean.length, 5);
   // detail 1 with branch → marks still render; detail 0 (no branch) → none
   assert.ok(row.render(snap({ session: session({ branch: "main" }), git: g }), 1)!.some((f) => f.text === "*"));
   assert.ok(!row.render(snap({ session: session({ branch: "main" }), git: g }), 0)!.some((f) => f.text === "*"));

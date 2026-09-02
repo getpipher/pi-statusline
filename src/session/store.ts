@@ -41,6 +41,7 @@ export interface SessionSnapshot {
   contextTokens: number | null;
   contextWindow: number;
   contextPercent: number | null;
+  thinkingLevel: string; // pi ThinkingLevel (off|minimal|low|medium|high|xhigh|max) — v0.4.6
   spanMs: number;
 }
 
@@ -98,6 +99,12 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
         contextTokens: contextUsage?.tokens ?? null,
         contextWindow: contextUsage?.contextWindow ?? 0,
         contextPercent: contextUsage?.percent ?? null,
+        // Defensive accessor: fake/older host contexts may lack getThinkingLevel —
+        // degrade to "off" rather than crash the render loop.
+        thinkingLevel:
+          typeof (ctx as unknown as { getThinkingLevel?: () => string }).getThinkingLevel === "function"
+            ? (ctx as unknown as { getThinkingLevel: () => string }).getThinkingLevel()
+            : "off",
         spanMs: Math.max(0, now() - spanStart),
       };
     },
@@ -113,6 +120,7 @@ export function createSessionStore(deps: SessionStoreDeps = {}): SessionStore {
           contextTokens: null,
           contextWindow: 0,
           contextPercent: null,
+          thinkingLevel: "off",
           spanMs: 0,
         }
       );

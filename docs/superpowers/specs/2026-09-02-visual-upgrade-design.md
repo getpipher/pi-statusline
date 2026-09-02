@@ -41,7 +41,7 @@ const THEME_PRESETS: Record<string, ThemePreset> = {
 
 - Config: `display.theme: "gruvbox"` etc. — validated at use (unknown → default + one-time warn).
 - `applyThemeColor(token, preset)` resolves the token to a truecolor hex, which the renderer emits as `ESC[38;2;R;G;Bm`.
-- 16-color / 256-color terminals: precompute the nearest ANSI-256 index per hex (one-time at preset load); a `TERM=xterm` fallback maps to the closest named ANSI color.
+- 16-color / 256-color terminals: **out of scope for v0.5** — presets emit truecolor hex only; terminals without truecolor support will see degraded colors (most modern terminals — Ghostty, Kitty, iTerm2, Alacritty, WezTerm, Windows Terminal — support truecolor). Truecolor-to-256 fallback is tracked as a v0.6 follow-up.
 - The `mono` preset stays as-is (semantic flattening). The `default` preset passes through pi's live theme unchanged (the current behavior).
 
 ### 2. Nerd Font / Unicode / ASCII glyph tables (`src/glyphs.ts`)
@@ -74,9 +74,9 @@ A `statusGlyph(value: number, thresholds: [warn, err], style): string` helper th
 
 `renderBar(ratio, cells, style)` gains a style param: `"blocks"` (current `█░`), `"rounded"` (`▰▱`), `"dots"` (`●●○○○`), `"shaded"` (`▓▒░`). Config: `display.barStyle`. Default stays `"blocks"`.
 
-### 5. Idle dimming (render-path check)
+### 5. Idle dimming — DEFERRED to v0.6
 
-If `Date.now() − lastActivityTs > idleDimMinutes × 60_000` (config, default 10), the renderer wraps all rows' tokens to `muted` before theme.fg. `lastActivityTs` is updated by the existing session/event lifecycle — no new timer, no new source. Config: `display.idleDim: boolean` (default true).
+The design originally proposed dimming after N minutes idle, but pi-statusline has no activity-input signal — the footer re-renders on ticker/event, not on user keystrokes. Adding an activity source requires either (a) a new input from pi's extension API (not available in 0.84.4), or (b) a heuristic (e.g. "no state change between ticks = idle"), which is unreliable. DEFERRED until pi exposes an activity signal.
 
 ### 6. Deferred to v0.6 (tracked, not in this spec)
 
@@ -84,8 +84,18 @@ If `Date.now() − lastActivityTs > idleDimMinutes × 60_000` (config, default 1
 - Powerline separator mode (needs per-segment bg colors + a separator bridge; biggest renderer change)
 - Right-aligned ambient split (needs width-aware padding calc per render)
 - Braille spinner (needs a sub-tick interval; only animates during in-flight fetches)
+- Idle dimming (needs an activity signal from pi)
+- Truecolor-to-256-color fallback (precompute nearest ANSI-256 per hex at preset load)
 
-## Architecture
+## Render-path tension (the one real design tradeoff)
+
+**Today**: `theme.fg(ColorToken, text)` — pi's live theme resolves each token to a color. Presets that emit truecolor hex BYPASS this — they hardcode the color per preset, losing pi-theme integration.
+
+**Two options, chosen**: (a) presets emit truecolor hex directly — loses pi-theme integration but gives full color control (the RECTOR wants colorful, not pi-theme-matched); (b) presets define token remaps and let pi's theme resolve — but pi's theme has a fixed palette that can't express gruvbox/tokyo-night/pastel hues.
+
+**Chosen: (a) truecolor hex.** The RECTOR explicitly asked for "more colorful" and named CCS/p10k/rainbow as references — all of which use hardcoded truecolor palettes. Pi-theme integration is preserved for the `default` preset only; other presets override with truecolor. The render path changes from `theme.fg(token, text)` to `ansi(hex, text)` for non-default presets (a one-line switch in the render loop). The tradeoff is that users who switch their terminal theme will see the statusline colors stay fixed — which is the intent (the statusline has its own personality).
+
+## Error handling / degradation
 
 New/modified modules:
 - `src/theme.ts` — extended: preset registry + truecolor resolution + ANSI-256 fallback

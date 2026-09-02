@@ -37,6 +37,12 @@ export function createIdentityRow(): Row {
         }
       }
       frags.push({ text: `${frags.length > 0 ? " | " : ""}${formatModelName(s.modelId)}`, color: "accent" });
+      // Thinking level rides the model (v0.4.6): the requested reasoning effort for future
+      // turns — `off` included, so a disabled state is visible, not silently absent.
+      // detail>=1 shrink casualty (the model itself survives to detail 0).
+      if (detail >= 1) {
+        frags.push({ text: ` · ${s.thinkingLevel}`, color: "dim" });
+      }
       return frags;
     },
   };

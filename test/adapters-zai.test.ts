@@ -134,7 +134,7 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     session: {
       sessionName: undefined, repoName: "r", branch: "main", modelId: "glm-5.2", provider: "zai",
       usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 },
-      contextTokens: null, contextWindow: 0, contextPercent: null, spanMs: 0,
+      contextTokens: null, contextWindow: 0, contextPercent: null, thinkingLevel: "off", spanMs: 0,
     } satisfies SessionSnapshot,
     ledger: null as never,
     statuses: "",

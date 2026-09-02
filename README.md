@@ -12,7 +12,7 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 ## Render preview
 
 ```
-v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
+v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2 · high
 Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out | Cache: 68% hit
 REPO $12.34 | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75
 zai 5HRS 75%/42% (2.0k) reset 2h55m | 7DAY 15%/86% (10k) reset 1d0h
@@ -28,6 +28,8 @@ its own usage heat (`accent`, escalating to `warning`/`error` at ≥70%/≥90%);
 segment carries its own `reset` countdown (v0.4.6), riding the window's heat color; values
 `text`; dirty `*` + ahead/behind
 ` ↑n ↓n` marks ride the branch in `toolTitle`; labels/separators dim; ambient row fully dim.
+The model is followed by the **thinking level** (v0.4.6, dim ` · high`) — the requested
+reasoning effort pi will use for future turns (`off` included, so a disabled state is visible).
 Separator is ` | `. The deen strip uses CCS prayer states (v0.4.1): the **next prayer is
 green** (`success`), past prayers dim with `✓`, upcoming prayers plain `text` — steady colors,
 no proximity escalation (see **Deen**).

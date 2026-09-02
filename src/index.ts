@@ -293,6 +293,11 @@ export function activateStatusline(
     requestRenderFn?.();
   });
 
+  pi.on("thinking_level_select", (_event) => {
+    // Same contract as model_select: store.update() re-reads getThinkingLevel per render.
+    requestRenderFn?.();
+  });
+
   pi.registerCommand("statusline", {
     description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
