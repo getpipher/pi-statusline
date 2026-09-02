@@ -46,6 +46,20 @@ test("renderBar renders a 10-cell block bar clamped to [0,1]", () => {
   assert.equal(renderBar(Number.NaN), "▕░░░░░░░░░░▏");
 });
 
+test("renderBar style variants (end-caps preserved, fill/empty glyphs swap)", () => {
+  // blocks (default)
+  assert.equal(renderBar(0.5, 10, "blocks"), "▕█████░░░░░▏");
+  // rounded
+  assert.equal(renderBar(0.5, 10, "rounded"), "▕▰▰▰▰▰▱▱▱▱▱▏");
+  // dots
+  assert.equal(renderBar(0.5, 10, "dots"), "▕●●●●●○○○○○▏");
+  // shaded
+  assert.equal(renderBar(0.5, 10, "shaded"), "▕▓▓▓▓▓░░░░░▏");
+  // 0% and 100% edges
+  assert.equal(renderBar(0, 5, "dots"), "▕○○○○○▏");
+  assert.equal(renderBar(1, 5, "dots"), "▕●●●●●▏");
+});
+
 test("formatClock renders 24h local HH:MM", () => {
   // 2026-08-30T04:12:00Z — assertions use the local zone of the test runner.
   const ts = Date.UTC(2026, 7, 30, 4, 12);
@@ -62,11 +76,11 @@ test("formatSpan renders h/m compact forms", () => {
   assert.equal(formatSpan((3 * 60 + 12) * 60_000), "3h12m");
 });
 
-test("formatReset renders countdown buckets (moved from segments/quota.ts)", () => {
+test("formatReset renders countdown buckets with unit spaces (v0.4.7 quota style)", () => {
   const now = 1_000_000_000_000;
   assert.equal(formatReset(now - 1, now), "now");
-  assert.equal(formatReset(now + 2 * 3_600_000 + 55 * 60_000, now), "2h55m");
-  assert.equal(formatReset(now + 26 * 3_600_000, now), "1d2h");
+  assert.equal(formatReset(now + 2 * 3_600_000 + 55 * 60_000, now), "2h 55m");
+  assert.equal(formatReset(now + 26 * 3_600_000, now), "1d 2h");
 });
 
 test("splitBar splits a 10-cell bar into an accent-fillable head and dim tail", () => {

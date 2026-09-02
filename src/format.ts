@@ -17,10 +17,20 @@ export function formatMoney(n: number): string {
   return n.toFixed(2);
 }
 
-export function renderBar(ratio: number, cells = 10): string {
+export type BarStyle = "blocks" | "rounded" | "dots" | "shaded";
+
+const BAR_CHARS: Record<BarStyle, { filled: string; empty: string }> = {
+  blocks: { filled: "█", empty: "░" },
+  rounded: { filled: "▰", empty: "▱" },
+  dots: { filled: "●", empty: "○" },
+  shaded: { filled: "▓", empty: "░" },
+};
+
+export function renderBar(ratio: number, cells = 10, style: BarStyle = "blocks"): string {
   const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
+  const chars = BAR_CHARS[style] ?? BAR_CHARS.blocks;
   const filled = Math.round(clamped * cells);
-  return `▕${"█".repeat(filled)}${"░".repeat(cells - filled)}▏`;
+  return `▕${chars.filled.repeat(filled)}${chars.empty.repeat(cells - filled)}▏`;
 }
 
 // Two-tone bar: head (`▕` + filled cells) takes the fill color (accent/warning/error),
@@ -47,7 +57,8 @@ export function formatSpan(ms: number): string {
   return `${hours}h${totalMinutes % 60}m`;
 }
 
-// Countdown to a ms-epoch reset (moved verbatim in spirit from v1 segments/quota.ts).
+// Countdown to a ms-epoch reset. v0.4.7: unit spaces (`3h 57m`, `6d 6h`) — RECTOR's
+// pomodoro style for the quota-row parenthetical.
 export function formatReset(targetMs: number, now: number): string {
   const remaining = targetMs - now;
   if (remaining <= 0) return "now";
@@ -55,7 +66,7 @@ export function formatReset(targetMs: number, now: number): string {
   const minutes = Math.floor((remaining % 3_600_000) / 60_000);
   if (hours > 24) {
     const days = Math.floor(hours / 24);
-    return `${days}d${hours % 24}h`;
+    return `${days}d ${hours % 24}h`;
   }
-  return `${hours}h${minutes}m`;
+  return `${hours}h ${minutes}m`;
 }
