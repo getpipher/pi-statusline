@@ -95,7 +95,7 @@ The design originally proposed dimming after N minutes idle, but pi-statusline h
 
 **Chosen: (a) truecolor hex.** The RECTOR explicitly asked for "more colorful" and named CCS/p10k/rainbow as references — all of which use hardcoded truecolor palettes. Pi-theme integration is preserved for the `default` preset only; other presets override with truecolor. The render path changes from `theme.fg(token, text)` to `ansi(hex, text)` for non-default presets (a one-line switch in the render loop). The tradeoff is that users who switch their terminal theme will see the statusline colors stay fixed — which is the intent (the statusline has its own personality).
 
-## Error handling / degradation
+## Modules
 
 New/modified modules:
 - `src/theme.ts` — extended: preset registry + truecolor resolution + ANSI-256 fallback
@@ -112,7 +112,6 @@ Data flow unchanged: config → render(snapshot, detail) → fragments → theme
 - Unknown theme preset → default + one-time warn (existing pattern)
 - Unknown glyph style → unicode (safe default)
 - No Nerd Font in terminal → unicode fallback renders in any modern terminal (geometric shapes, not PUA codepoints)
-- Truecolor unavailable → nearest ANSI-256 precomputed per hex (one-time at preset load); 16-color → nearest named ANSI
 
 ## Testing
 
@@ -120,6 +119,5 @@ Data flow unchanged: config → render(snapshot, detail) → fragments → theme
 - Glyph tables: every segment/style combo returns a non-empty string
 - renderBar styles: each style produces the right filled/empty chars at 0%, 50%, 100%
 - statusGlyph: each threshold band returns the right glyph
-- Idle dimming: threshold boundary at exactly idleDimMinutes
 - Config parse: lenient for all three new display fields
 - Integration: existing tests unchanged (defaults preserve current rendering)
