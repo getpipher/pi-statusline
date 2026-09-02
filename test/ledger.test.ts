@@ -124,7 +124,9 @@ test("reconcile never throws on persist failure — fail-open, counts persisted 
   const blockingDir = join(dir, "blocking-dir"); // filePath IS a directory → appendFileSync throws EISDIR
   mkdirSync(blockingDir);
   const warnings: string[] = [];
-  const store = createLedgerStore({ filePath: blockingDir, utcOffsetMinutes: SGT, warn: (m) => warnings.push(m) });
+  // Fixed clock: the assertion pins entries to 2026-08-30 and reads day-scoped todayCost —
+  // real wall-clock made this fail once the calendar rolled past Aug 30 (SGT).
+  const store = createLedgerStore({ filePath: blockingDir, now: () => Date.UTC(2026, 7, 30, 10, 0), utcOffsetMinutes: SGT, warn: (m) => warnings.push(m) });
   store.load();
   const entries = [
     entry("b1", "2026-08-30T09:00:00.000Z", 0.5),
