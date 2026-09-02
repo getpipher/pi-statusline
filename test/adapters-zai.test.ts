@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createZaiAdapter, renderZaiQuota } from "../src/adapters/zai.ts";
+import { createZaiAdapter, renderZaiQuota, zaiSegments } from "../src/adapters/zai.ts";
 import { resolveQuotaAdapter } from "../src/adapters/types.ts";
 import { createQuotaRow } from "../src/rows/quota.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
@@ -22,18 +22,52 @@ const QUOTA: QuotaResult = {
   fetchedAt: NOW,
 };
 
-test("renderZaiQuota produces the exact label-first format", () => {
+test("renderZaiQuota produces the exact v0.4.1 segment format (usage%/elapsed% label (ceiling))", () => {
+  // 5h window: reset = NOW+2h55m → elapsed 2h05m of 5h = 42%; weekly: 6d of 7d elapsed = 86%.
   assert.equal(
     renderZaiQuota(QUOTA, NOW),
-    "zai ▕████████░░▏ 75% 1.5k/2.0k 5h | wk 15% | reset 2h55m",
+    "zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m",
   );
 });
 
 test("renderZaiQuota falls back to weekly when 5h window is missing", () => {
   const weeklyOnly = { ...QUOTA, fiveHour: null } as QuotaResult;
   const out = renderZaiQuota(weeklyOnly, NOW);
-  assert.ok(out.startsWith("zai ▕██░░░░░░░░▏ 15%"));
+  assert.ok(out.startsWith("zai 7DAY 15%/86% (10k)"), out);
   assert.ok(!out.includes("5h"));
+});
+
+test("zaiSegments: per-window heat (5h% and weekly% tint independently), reset dim periphery", () => {
+  const segs = zaiSegments(QUOTA, NOW);
+  assert.deepEqual(
+    segs.map((s) => ({ text: s.text, heat: s.heat, color: s.color })),
+    [
+      { text: "zai 75%/42% 5h (2.0k)", heat: 75, color: undefined },
+      { text: " | 7DAY 15%/86% (10k)", heat: 15, color: undefined },
+      { text: " | reset 2h55m", heat: null, color: "dim" },
+    ],
+  );
+});
+
+test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent, reset dim; est appended", async () => {
+  // Real adapter (segments path): per-window heat tints independently. The poller starts
+  // empty — seed it through the offline fetch seam before rendering.
+  const adapter = createZaiAdapter({
+    authJsonPath: "/dev/null",
+    readKey: () => "k",
+    pollIntervalMs: () => 180_000,
+    fetchFn: async () => QUOTA,
+  });
+  await adapter.fetch();
+  const row = createQuotaRow([adapter]);
+  const frags = row.render(snap({}), 2)!;
+  assert.deepEqual(frags, [
+    { text: "zai 75%/42% 5h (2.0k)", color: "warning" },
+    { text: " | 7DAY 15%/86% (10k)", color: "accent" },
+    { text: " | reset 2h55m", color: "dim" },
+    // Est: elapsed 125m → rate 720/h, remaining 175m → 1500 + 2100 = 3.6k (180%).
+    { text: " | est 3.6k (180%)", color: "text" },
+  ]);
 });
 
 test("createZaiAdapter: matches only zai; inert without key; fetch refreshes current()", async () => {

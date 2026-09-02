@@ -1,6 +1,6 @@
 // src/rows/context.ts
-import { formatTokenCount, splitBar } from "../format.ts";
-import type { ColorToken, Fragment, RowDetail } from "../types.ts";
+import { formatTokenCount } from "../format.ts";
+import type { Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
 export function createContextRow(): Row {
@@ -12,7 +12,8 @@ export function createContextRow(): Row {
       const display = snapshot.config.display;
       const frags: Fragment[] = [{ text: "ctx", color: "dim" }];
 
-      // Ratio: precomputed percent when present, else tokens/window.
+      // Ratio: precomputed percent when present, else tokens/window. The bar was removed
+      // in v0.4.1 (RECTOR) — plain percent + tokens read cleaner; `display.bars` is inert.
       const ratio =
         s.contextPercent !== null && Number.isFinite(s.contextPercent)
           ? s.contextPercent / 100
@@ -21,16 +22,6 @@ export function createContextRow(): Row {
             : null;
 
       const showPct = display.showContext && ratio !== null;
-      if (display.bars && ratio !== null && (showPct || s.contextTokens !== null)) {
-        // Two-tone bar: filled cells carry the escalation color (accent, warning ≥70%,
-        // error ≥90%); empty cells stay muted so usage reads as a filled gauge.
-        const pct = ratio * 100;
-        const fillColor: ColorToken = pct >= 90 ? "error" : pct >= 70 ? "warning" : "accent";
-        const { filled, empty } = splitBar(ratio);
-        frags.push({ text: ` ${filled}`, color: fillColor });
-        // Empty cells read as an unfilled gauge — muted (RECTOR: dim was low contrast).
-        frags.push({ text: empty, color: "muted" });
-      }
       if (showPct) {
         frags.push({ text: ` ${Math.round(ratio * 100)}%`, color: "text" });
         if (detail >= 2 && s.contextTokens !== null && s.contextWindow > 0) {

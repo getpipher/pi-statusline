@@ -1,7 +1,8 @@
 // src/adapters/zai.ts
-import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaPoller, type QuotaResult } from "../quota/zai.ts";
-import { formatTokenCount, formatReset, renderBar } from "../format.ts";
-import type { ProviderRowAdapter } from "./types.ts";
+import { createQuotaPoller, fetchQuota, readZaiKey, type QuotaLimit, type QuotaPoller, type QuotaResult } from "../quota/zai.ts";
+import { FIVE_HOUR_MS, WEEK_MS, windowElapsedPercent } from "../quota/project.ts";
+import { formatTokenCount, formatReset } from "../format.ts";
+import type { AdapterSegment, ProviderRowAdapter } from "./types.ts";
 
 export interface ZaiAdapterDeps {
   authJsonPath: string;
@@ -11,24 +12,44 @@ export interface ZaiAdapterDeps {
   onRefresh?: () => void;
 }
 
-// Pure formatter (spec §5 exact format): `zai ▕██████████░░░▏ 75% 1.5k/2.0k 5h · wk 12% · reset 2h55m`
-export function renderZaiQuota(data: QuotaResult, now: number): string {
-  const window = data.fiveHour ?? data.weekly;
-  const parts: string[] = [];
-  if (window) {
-    if (data.fiveHour) {
-      // Spec §5: bar+percent and the 5h tokens form ONE segment (space-joined, no ·).
-      parts.push(`${renderBar(window.percentage / 100)} ${window.percentage}% ${formatTokenCount(data.fiveHour.currentValue)}/${formatTokenCount(data.fiveHour.usage)} 5h`);
-    } else {
-      parts.push(`${renderBar(window.percentage / 100)} ${window.percentage}%`);
-    }
+// Window segment pieces (v0.4.1, RECTOR format): `usage%/window-elapsed%` + ceiling —
+// e.g. `3%/50% 5h (28k)`. usage% from the API; elapsed% from the window clock; ceiling =
+// the plan's max credits for that window (console "Credits x / 28K"), NOT current burn.
+// Label placement differs per window: `5h` suffixes (window duration), `7DAY` prefixes
+// (CCS money-label style, RECTOR: drop our `wk`).
+function windowPercents(w: QuotaLimit, lengthMs: number, now: number): string {
+  return `${w.percentage}%/${windowElapsedPercent(w.nextResetTime, lengthMs, now)}%`;
+}
+
+function windowCeiling(w: QuotaLimit): string {
+  return `(${formatTokenCount(w.usage)})`;
+}
+
+// Pure segment list (preferred by the quota row — per-window heat tints). Weekly uses the
+// CCS label `7DAY` (RECTOR: drop our `wk`); reset is its own dim periphery segment.
+export function zaiSegments(data: QuotaResult, now: number): AdapterSegment[] {
+  const segs: AdapterSegment[] = [];
+  // The first rendered segment carries the `zai` label; later ones own the " | " separator
+  // (weekly-only data → `zai 7DAY …`, never an orphan leading separator).
+  const prefix = (text: string): string => (segs.length === 0 ? `zai ${text}` : ` | ${text}`);
+  if (data.fiveHour) {
+    segs.push({ text: prefix(`${windowPercents(data.fiveHour, FIVE_HOUR_MS, now)} 5h ${windowCeiling(data.fiveHour)}`), heat: data.fiveHour.percentage });
   }
-  if (data.weekly) parts.push(`wk ${data.weekly.percentage}%`);
+  if (data.weekly) {
+    segs.push({ text: prefix(`7DAY ${windowPercents(data.weekly, WEEK_MS, now)} ${windowCeiling(data.weekly)}`), heat: data.weekly.percentage });
+  }
   const resets = [data.fiveHour?.nextResetTime, data.weekly?.nextResetTime].filter(
     (t): t is number => typeof t === "number",
   );
-  if (resets.length > 0) parts.push(`reset ${formatReset(Math.min(...resets), now)}`);
-  return `zai ${parts.join(" | ")}`;
+  if (resets.length > 0) {
+    segs.push({ text: prefix(`reset ${formatReset(Math.min(...resets), now)}`), heat: null, color: "dim" });
+  }
+  return segs;
+}
+
+// Single-string form of the segments (contract fallback; dim handled by the row).
+export function renderZaiQuota(data: QuotaResult, now: number): string {
+  return zaiSegments(data, now).map((s) => s.text).join("");
 }
 
 export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<QuotaResult> {
@@ -57,6 +78,7 @@ export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<Quota
       return poller!.get();
     },
     render: (data, _dim) => renderZaiQuota(data, Date.now()),
+    segments: (data, now) => zaiSegments(data, now),
     // Heat = 5h window usage (weekly fallback) — mirrors the ctx row's escalation bands.
     heat: (data) => data.fiveHour?.percentage ?? data.weekly?.percentage ?? null,
     start() {
