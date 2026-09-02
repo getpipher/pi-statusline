@@ -489,6 +489,34 @@ test("v2 P3 wiring: makeAdapters deps include a resolving ledger getter", async 
 
 // ── v2 P3 wiring: named theme presets — remap through theme.fg + one-time unknown notify ──
 
+test("visual upgrade: gruvbox preset emits truecolor ANSI, bypassing theme.fg", async () => {
+  const h = makeHarness();
+  try {
+    writeFileSync(h.configPath, JSON.stringify({ display: { theme: "gruvbox" } }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    h.colors.length = 0;
+    const flat = h.footerHolder.current!.render(500).join("\n");
+    // Truecolor SGR sequences present (e.g. toolTitle #83a598 → 38;2;131;165;152)
+    assert.match(flat, /\x1b\[38;2;131;165;152m/, "toolTitle hex #83a598 emitted as truecolor SGR");
+    // No fragment color reached theme.fg — gruvbox covers every token with hex
+    assert.equal(h.colors.length, 0, `theme.fg must not be called, saw: ${[...new Set(h.colors.map((c) => c.color))]}`);
+    // Content unchanged
+    assert.match(flat, /main/, "text content survives the truecolor path");
+    assert.equal(h.notifications.filter((n) => n.message.includes("display.theme")).length, 0, "gruvbox is known — no notify");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
 test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", async () => {
   // (a) mono: no success/toolTitle color names reach theme.fg; content unchanged
   {
