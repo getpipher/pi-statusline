@@ -681,3 +681,56 @@ test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", 
     rmSync(h.tmp, { recursive: true, force: true });
   }
 });
+
+// ── Final-review fix: ledger provider/model attribution wired through ensureLedger ──
+
+test("final-fix: session attribution flows ctx → store → adapter (OR today fragment live)", async () => {
+  const h = makeHarness();
+  try {
+    type LedgerGetter = () => import("../src/ledger/store.ts").LedgerStore | null;
+    let injectedLedger: LedgerGetter | undefined;
+    // providerTodayCost scopes to TODAY's local-day bucket — timestamp the fixture
+    // entries into the current day (the same mutation the Task-5/11 wiring tests use).
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{ timestamp: string }>;
+    entries[0]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    const fakeOr: ProviderRowAdapter<Record<string, never>> = {
+      id: "openrouter",
+      matches: (p) => p === "openrouter",
+      current: () => ({}) as never,
+      fetch: async () => ({}) as never,
+      // Renders through the INJECTED ledger dep — the real store-to-row path.
+      render: (_d, _dim) => {
+        const l = injectedLedger?.() ?? null;
+        const today = l ? l.providerTodayCost("zai") : -1;
+        return `or-ledger $${today.toFixed(2)} today`;
+      },
+      start: () => {},
+      stop: () => {},
+    };
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: (deps) => {
+        injectedLedger = deps.ledger;
+        return [fakeOr];
+      },
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    const flat = h.footerHolder.current!.render(500).join("\n");
+    // harness fixture: provider zai, entries 0.25 + 0.75 → today = $1.00 via the REAL store
+    assert.match(flat, /or-ledger \$1\.00 today/, `ledger-derived today on the OR line: ${flat.split("\n").find((l) => l.includes("or-ledger"))}`);
+    // and the persisted line itself carries the attribution
+    const lines = readFileSync(join(h.tmp, "ledger.jsonl"), "utf8").trim().split("\n");
+    const last = JSON.parse(lines[lines.length - 1]!) as { provider: string; model: string };
+    assert.equal(last.provider, "zai", "ledger line records provider zai");
+    assert.equal(last.model, "glm-5.2", "ledger line records the live model id");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});

@@ -1,7 +1,7 @@
 // src/quota/project.ts
 import type { QuotaResult } from "./zai.ts";
 
-const FIVE_HOUR_MS = 5 * 3_600_000;
+export const FIVE_HOUR_MS = 5 * 3_600_000;
 
 export interface BlockProjection {
   units: number;  // projected quota credits consumed at window reset

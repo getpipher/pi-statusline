@@ -157,4 +157,4 @@ The footer now tracks the Claude Code statusline's live surface at ~14/14
 groups (identity/session, branch + dirty/ahead-behind, model, context bar +
 window, token flow, cache hit, session/day/7d/30d spend, sparkline, burn rate,
 quota bar + windows + reset, projection/est, git commits-today, version
-stamps) — with TON-style deen and provider adapters beyond it.
+stamps) — with the deen prayer strip and pluggable provider adapters beyond it.

@@ -23,6 +23,7 @@ import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
 import { applyThemeColor, THEME_PRESETS } from "./theme.ts";
+import { FIVE_HOUR_MS } from "./quota/project.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -144,7 +145,22 @@ export function activateStatusline(
       // Task-6 wiring tail: attribute lines with the current repo so the REPO all-time
       // total renders. pi launches in the project dir — basename(cwd) matches
       // SessionStore's repoName default (identity-row consistency).
-      ledgerStore = createLedgerStore({ filePath: dependencies.ledgerPath, repo: () => basename(process.cwd()) });
+      // Final-review fix: live session attribution — without this every line records
+      // "unknown" and the OpenRouter row's today/top fragments can never render.
+      // Defensive (repo accessor precedent): a throwing accessor must not crash
+      // reconcile-on-render — degrade to unknown.
+      ledgerStore = createLedgerStore({
+        filePath: dependencies.ledgerPath,
+        repo: () => basename(process.cwd()),
+        attribute: () => {
+          try {
+            const s = sessionStore.getSnapshot();
+            return { provider: s.provider ?? "unknown", model: s.modelId ?? "unknown" };
+          } catch {
+            return { provider: "unknown", model: "unknown" };
+          }
+        },
+      });
       ledgerStore.load();
     }
     return ledgerStore;
@@ -215,7 +231,7 @@ export function activateStatusline(
           const winData = winner?.current() as { fiveHour?: { nextResetTime?: number } } | null | undefined;
           const reset = winData?.fiveHour?.nextResetTime;
           if (typeof reset === "number" && Number.isFinite(reset) && reset > Date.now()) {
-            const startMs = reset - 5 * 3_600_000;
+            const startMs = reset - FIVE_HOUR_MS;
             quotaWindow = { startMs, endMs: reset, cost: ledger.costSince(startMs) };
           }
           const snapshot: RowSnapshot = {
@@ -269,6 +285,11 @@ export function activateStatusline(
     sessionCtx = ctx;
     if (config.enabled) {
       sessionStore = createSessionStore(); // fresh span per session
+      // Attribution ordering: capture ctx.model (provider/modelId) BEFORE the first
+      // reconcile — lines persist once (idempotent seen-set), so a provider-less
+      // first write would freeze "unknown" onto them. Render's update() refreshes
+      // branch/usage afterwards.
+      sessionStore.update(ctx, null);
       ensureLedger().reconcile(ctx.sessionManager.getEntries());
       buildAdapters();
       installFooter(ctx);
@@ -290,7 +311,7 @@ export function activateStatusline(
       const action = parseStatuslineArgs(args);
       switch (action.action) {
         case "open-panel":
-          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto>", "info");
+          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>", "info");
           break;
         case "refresh": {
           if (adapters.length === 0) {
