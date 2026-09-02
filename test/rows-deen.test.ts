@@ -45,14 +45,14 @@ function plain(frags: ReturnType<ReturnType<typeof createDeenRow>["render"]>): s
   return (frags ?? []).map((f) => f.text).join("");
 }
 
-test("deen row: calm labelless strip — past ✓, next countdown (hijri/city moved to ambient)", () => {
+test("deen row: CCS states — next prayer green, past dim ✓, upcoming plain (labelless strip)", () => {
   const frags = createDeenRow().render(snap({ deen: deen({}) }), 2)!;
   assert.deepEqual(frags, [
-    { text: "Fajr", color: "dim" }, { text: " 05:00", color: "text" }, { text: " ✓", color: "success" },
-    { text: " | Dhuhr", color: "dim" }, { text: " 12:00", color: "text" }, { text: " (2h)", color: "text" },
-    { text: " | Asr", color: "dim" }, { text: " 15:30", color: "text" },
-    { text: " | Maghrib", color: "dim" }, { text: " 18:00", color: "text" },
-    { text: " | Isha", color: "dim" }, { text: " 19:30", color: "text" },
+    { text: "Fajr", color: "dim" }, { text: " 05:00", color: "dim" }, { text: " ✓", color: "dim" },
+    { text: " | Dhuhr", color: "success" }, { text: " 12:00", color: "success" }, { text: " (2h)", color: "success" },
+    { text: " | Asr", color: "text" }, { text: " 15:30", color: "text" },
+    { text: " | Maghrib", color: "text" }, { text: " 18:00", color: "text" },
+    { text: " | Isha", color: "text" }, { text: " 19:30", color: "text" },
   ]);
 });
 
@@ -63,8 +63,8 @@ test("deen row: detail 1 drops past prayers (countdown + stale kept); detail 0 i
   assert.ok(one.includes("Dhuhr 12:00 (2h)") && one.includes("Asr") && one.includes("stale 4m"), `detail 1: ${one}`);
   const zero = row.render(snap({ deen: deen({}) }), 0)!;
   assert.deepEqual(zero, [
-    { text: "Dhuhr", color: "dim" },
-    { text: " (2h)", color: "text" },
+    { text: "Dhuhr", color: "success" },
+    { text: " (2h)", color: "success" },
   ]);
 });
 
@@ -81,20 +81,17 @@ test("deen row: countdown format — (45m) under an hour, (2h) whole hours", () 
   assert.ok(plain(createDeenRow().render(snap({ deen: whole }), 2)).includes(" (2h)"));
 });
 
-test("deen row: escalation colors — soon brightens names, near accents countdown+next name, imminent all accent", () => {
+test("deen row: states are escalation-independent (v0.4.1 static green — bands retired)", () => {
   const row = createDeenRow();
-  const soon = row.render(snap({ deen: deen({ escalation: "soon" }) }), 2)!;
-  assert.equal(soon[0]!.color, "text"); // Fajr name brightened from dim
-  const near = row.render(snap({ deen: deen({ escalation: "near" }) }), 2)!;
-  const nearText = near.find((f) => f.text === " (2h)")!;
-  assert.equal(nearText.color, "accent");
-  // Fused-separator model (calm pin is the reviewed contract): block names carry " | ".
-  assert.equal(near.find((f) => f.text === " | Dhuhr")!.color, "accent");
-  const imminent = row.render(snap({ deen: deen({ escalation: "imminent" }) }), 2)!;
-  assert.ok(imminent.every((f) => f.color === "accent"));
+  for (const escalation of ["calm", "soon", "near", "imminent", "adhan"] as const) {
+    const frags = row.render(snap({ deen: deen({ escalation }) }), 2)!;
+    assert.equal(frags[0]!.color, "dim", `Fajr stays dim under ${escalation}`);
+    const dhuhr = frags.find((f) => f.text === " | Dhuhr")!;
+    assert.equal(dhuhr.color, "success", `next stays green under ${escalation}`);
+  }
 });
 
-test("deen row: adhan — started prayer name accent with · adhan marker", () => {
+test("deen row: adhan — the started prayer reads completed (dim ✓), CCS-faithful", () => {
   const adhan = deen({
     escalation: "adhan",
     schedule: sched([
@@ -104,9 +101,10 @@ test("deen row: adhan — started prayer name accent with · adhan marker", () =
   });
   const frags = createDeenRow().render(snap({ deen: adhan }), 2)!;
   const text = plain(frags);
-  assert.ok(text.includes("Dhuhr 12:00 · adhan"));
+  assert.ok(text.includes("Dhuhr 12:00 ✓"));
+  assert.ok(!text.includes("adhan"), "no adhan marker (CCS-faithful)");
   const dhuhrName = frags.find((f) => f.text === " | Dhuhr")!;
-  assert.equal(dhuhrName.color, "accent");
+  assert.equal(dhuhrName.color, "dim");
 });
 
 test("deen row: stale marker (warning) appended; row omitted when deen is null", () => {

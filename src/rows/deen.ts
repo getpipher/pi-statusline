@@ -18,31 +18,23 @@ function wallTime(wallMin: number): string {
   return `${String(Math.floor(wallMin / 60)).padStart(2, "0")}:${String(wallMin % 60).padStart(2, "0")}`;
 }
 
-// Block fragments AFTER the name (which carries the block's separator prefix).
-function prayerTail(entry: PrayerScheduleEntry, esc: DeenSnapshot["escalation"]): Fragment[] {
-  const tail: Fragment[] = [
-    { text: ` ${wallTime(entry.wallMin)}`, color: esc === "imminent" ? "accent" : "text" },
-  ];
-  if (entry.state === "adhan") {
-    tail.push({ text: " · adhan", color: "dim" });
-    if (entry.minutesUntil >= -2) tail.push({ text: ` ${countdown(0)}`, color: "accent" });
-  }
-  if (entry.state === "past") tail.push({ text: " ✓", color: esc === "imminent" ? "accent" : "success" });
-  if (entry.state === "next") {
-    tail.push({ text: ` ${countdown(entry.minutesUntil)}`, color: esc === "near" || esc === "imminent" ? "accent" : "text" });
-  }
-  return tail;
+// CCS-faithful prayer states (v0.4.1, RECTOR — verified against claude-code-statusline
+// lib/prayer/display.sh): the NEXT prayer is bright green (our `success` token — CCS
+// default `bright_green`), completed prayers are dim with ✓, upcoming prayers plain.
+// Steady green — the v0.3 escalation bands are retired (deen.escalateMinutes inert).
+function stateColor(entry: PrayerScheduleEntry): ColorToken {
+  if (entry.state === "next") return "success";
+  if (entry.state === "past" || entry.state === "adhan") return "dim";
+  return "text";
 }
 
-// Name color per escalation (pinned tests): imminent accents everything (separators live
-// inside the name fragment); soon brightens names; near accents the NEXT prayer's name;
-// the started prayer is always accent.
-function nameColor(entry: PrayerScheduleEntry, esc: DeenSnapshot["escalation"]): ColorToken {
-  if (esc === "imminent") return "accent";
-  if (esc === "soon") return "text";
-  if (esc === "near") return entry.state === "next" ? "accent" : "text";
-  if (entry.state === "adhan") return "accent";
-  return "dim";
+// Block fragments AFTER the name (which carries the block's separator prefix).
+function prayerTail(entry: PrayerScheduleEntry): Fragment[] {
+  const color = stateColor(entry);
+  const tail: Fragment[] = [{ text: ` ${wallTime(entry.wallMin)}`, color }];
+  if (entry.state === "past" || entry.state === "adhan") tail.push({ text: " ✓", color });
+  if (entry.state === "next") tail.push({ text: ` ${countdown(entry.minutesUntil)}`, color });
+  return tail;
 }
 
 export function createDeenRow(): Row {
@@ -52,15 +44,14 @@ export function createDeenRow(): Row {
     render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null {
       const d = snapshot.deen;
       if (!d) return null;
-      const esc = d.escalation;
 
-      // Detail 0 — next prayer only: `Dhuhr (2h)` with escalation colors.
+      // Detail 0 — next prayer only: `Dhuhr (2h)` in the next-prayer green.
       if (detail === 0) {
         const next = d.schedule.find((e) => e.state === "next");
         if (!next) return null;
         return [
-          { text: next.name, color: nameColor(next, esc) },
-          { text: ` ${countdown(next.minutesUntil)}`, color: esc === "near" || esc === "imminent" ? "accent" : "text" },
+          { text: next.name, color: "success" },
+          { text: ` ${countdown(next.minutesUntil)}`, color: "success" },
         ];
       }
 
@@ -70,8 +61,8 @@ export function createDeenRow(): Row {
       const shown = detail >= 2 ? d.schedule : d.schedule.filter((e) => e.state !== "past");
       const frags: Fragment[] = [];
       shown.forEach((entry, i) => {
-        frags.push({ text: `${i === 0 ? "" : " | "}${entry.name}`, color: nameColor(entry, esc) });
-        frags.push(...prayerTail(entry, esc));
+        frags.push({ text: `${i === 0 ? "" : " | "}${entry.name}`, color: stateColor(entry) });
+        frags.push(...prayerTail(entry));
       });
       if (d.staleMinutes !== null) frags.push({ text: ` | stale ${d.staleMinutes}m`, color: "warning" });
       return frags.length > 0 ? frags : null;

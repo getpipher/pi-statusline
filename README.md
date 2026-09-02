@@ -13,21 +13,21 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 
 ```
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
-ctx ▕███░░░░░░░▏ 34% 68k/200k | ↑48k ↓6.2k | cache 68%
+ctx 34% 68k/200k | ↑48k ↓6.2k | cache 68%
 REPO $12.34 | $1.24 sess | $8.40 day | $31.20 7d | $118.75 30d ▁▁▂▄▂▁▇ | $0.39/hr
-zai ▕████████░░▏ 75% 1.5k/2.0k 5h | wk 15% | reset 2h55m | est 3.6k (180%)
+zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
 04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4
 ```
 
 Color semantics (theme-integrated hues): money values + sparkline `success` (green), git branch
-and token flow `toolTitle` (blue), model + bar fills `accent` (escalating to `warning`/`error`
-at ≥70%/≥90%), quota row tints by usage heat (same bands); values `text` (the `est` projection
-rides the quota line in `text`); dirty `*` + ahead/behind ` ↑n ↓n` marks ride the branch in
-`toolTitle`; labels/separators dim; ambient row fully dim. Separator is ` | `. The deen strip
-escalates by proximity to the next
-prayer — calm names dim, times `text`, past prayers `✓` success, hijri + city muted, stale
-marker warning — intensifying to accent as the next prayer approaches (see **Deen**).
+and token flow `toolTitle` (blue), model `accent`; the quota row tints each window segment by
+its own usage heat (`accent`, escalating to `warning`/`error` at ≥70%/≥90%), with the `reset`
+countdown dim and the `est` projection in `text`; values `text`; dirty `*` + ahead/behind
+` ↑n ↓n` marks ride the branch in `toolTitle`; labels/separators dim; ambient row fully dim.
+Separator is ` | `. The deen strip uses CCS prayer states (v0.4.1): the **next prayer is
+green** (`success`), past prayers dim with `✓`, upcoming prayers plain `text` — steady colors,
+no proximity escalation (see **Deen**).
 With `display.theme: "mono"` the multi-hue tokens (`success`/`toolTitle`/`accent`) flatten to
 `text` while escalation (`warning`/`error`) and hierarchy (dim/muted) are preserved.
 
@@ -64,7 +64,7 @@ In `~/.pi/agent/settings.json`:
   of the registry (`identity`, `ctx`, `money`, `quota`, `deen`, `ambient`),
   never an invention. Unknown ids are dropped with a one-time warning (surfaced
   as a notify, once per id per session — handy for typo-spotting).
-- **`display.bars`** — gates the ctx row's progress bar.
+- **`display.bars`** — inert since v0.4.1 (the ctx and quota bars were removed per RECTOR; the key is still accepted for back-compat).
 - **`display.sparkline`** — gates the 7-day sparkline in the money line.
 - **`display.burnAnchor`** — the `$X/hr` anchor: `"session"` (default) burns session
   cost over the active session's wall time; `"block"` burns the 5h-block ledger
@@ -85,7 +85,7 @@ In `~/.pi/agent/settings.json`:
 - **`deen`** — prayer-tracker settings (see **Deen** below). `city` may be
   `"auto"` for IP-based geolocation; `method` is the [aladhan calculation
   method](https://aladhan.com/calculation-methods) ("auto" = aladhan default);
-  `escalateMinutes` sets how early the strip starts brightening (default 30).
+  `escalateMinutes` is inert since v0.4.1 (the proximity escalation was retired in favor of CCS prayer states; the key is still accepted for back-compat).
 - **Back-compat:** v1 config files load cleanly — the v1 `showTokens` /
   `showContext` / `showGit` / `showSession` flags are still honored where the
   merged rows allow, and a file without `rows` gets the full default order.
@@ -118,24 +118,19 @@ timezone** with a live countdown to the next prayer, the Hijri date, and the
 city. Data comes from the [aladhan](https://aladhan.com/) `timingsByCity` API
 (one call per local day), cached 24h at
 `~/.pi/agent/pi-statusline/deen-cache.json`; when a fetch fails the last-good
-timetable is served with a `stale Nm` marker. Past prayers carry `✓`; the
-started prayer is marked `· adhan`.
+timetable is served with a `stale Nm` marker. Prayer states are CCS-faithful
+(as of v0.4.1, matching claude-code-statusline's presentation): the **next prayer renders
+green** (`success`), past prayers render dim with `✓` — the just-started prayer reads
+completed immediately, with no separate adhan marker — and upcoming prayers render plain.
 
 With `city: "auto"`, the city is resolved once via IP geolocation (ipwho.is,
 cached 7 days alongside the timetable). Location is set with
 `/statusline deen <city|auto>` — persisted, and the strip is force-refreshed
 immediately.
 
-The strip escalates as the next prayer approaches (minutes until next, after
-the countdown floors):
-
-| Band | Trigger | Rendering |
-|---|---|---|
-| `calm` | > `escalateMinutes` | names dim, times `text` |
-| `soon` | ≤ `escalateMinutes` | names brighten to `text` |
-| `near` | ≤ 10 | next name + countdown accent |
-| `imminent` | ≤ 2 | the whole strip accent |
-| `adhan` | prayer started (≤ 0, > −10) | started prayer accent + `· adhan` |
+Until v0.3.x the strip escalated by proximity to the next prayer (dim → `text` →
+`accent` bands); v0.4.1 replaced that with the steady CCS states above, so the strip reads
+identically no matter how close the next adhan is.
 
 ## Commands
 
