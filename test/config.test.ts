@@ -21,7 +21,7 @@ afterEach(() => {
 test("DEFAULT_CONFIG has expected shape", () => {
   assert.deepEqual(DEFAULT_CONFIG, {
     enabled: true,
-    zai: { tier: "auto", pollIntervalMs: 180_000 },
+    zai: { tier: "auto", pollIntervalMs: 180_000, planPrice: 0 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
     display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false, theme: "default" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },

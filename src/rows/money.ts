@@ -19,9 +19,19 @@ export function createMoneyRow(): Row {
       if (detail >= 2) {
         frags.push({ text: ` | 7DAY $${formatMoney(ledger.last7Cost)}`, color: "success" });
         frags.push({ text: ` | 30DAY $${formatMoney(ledger.last30Cost)}`, color: "success" });
+        // API-equivalence marker (RECTOR): the $ meter is tokens × published API rates —
+        // i.e. what this usage would cost on pay-as-you-go. Labels the comparison at a glance.
+        frags.push({ text: " api-eq", color: "dim" });
         if (snapshot.config.display.sparkline) {
           const spark = renderSparkline(ledger.daily);
           if (spark) frags.push({ text: ` ${spark}`, color: "success" });
+        }
+        // Plan benefit: with the flat Coding Plan price configured, the 30DAY rolling
+        // API-equivalent minus that price = what the plan saved this month. Understated
+        // while the ledger is younger than 30 days (honest — we only count recorded days).
+        const plan = snapshot.config.zai.planPrice;
+        if (plan > 0 && ledger.last30Cost > plan) {
+          frags.push({ text: ` | plan saves $${Math.round(ledger.last30Cost - plan)}/mo`, color: "success" });
         }
       }
 

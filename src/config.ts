@@ -8,6 +8,10 @@ export interface StatuslineConfig {
   zai: {
     tier: "auto" | "lite" | "pro" | "max";
     pollIntervalMs: number;
+    // Monthly USD price of the user's flat Coding Plan — powers the money row's
+    // `plan saves $X/mo` fragment (API-equivalent 30DAY spend minus plan price).
+    // 0 = unset (fragment omitted; the `api-eq` marker still renders).
+    planPrice: number;
   };
   deen: {
     city: string;            // "auto" → IP-geo resolution
@@ -42,7 +46,7 @@ export interface ConfigLoadResult {
 
 export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
-  zai: { tier: "auto", pollIntervalMs: 180_000 },
+  zai: { tier: "auto", pollIntervalMs: 180_000, planPrice: 0 },
   deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
   providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   display: {
@@ -94,6 +98,9 @@ export function loadConfig(path: string): ConfigLoadResult {
     }
     if (typeof z.pollIntervalMs === "number" && z.pollIntervalMs > 0) {
       cfg.zai.pollIntervalMs = z.pollIntervalMs;
+    }
+    if (typeof z.planPrice === "number" && Number.isFinite(z.planPrice) && z.planPrice >= 0) {
+      cfg.zai.planPrice = z.planPrice;
     }
   }
 

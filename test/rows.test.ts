@@ -201,9 +201,38 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
     { text: " | DAY $8.40", color: "success" },
     { text: " | 7DAY $31.20", color: "success" },
     { text: " | 30DAY $118.75", color: "success" },
+    { text: " api-eq", color: "dim" },
     { text: " ▁▁▂▄▂▁▇", color: "success" },
     { text: " | $0.39/hr", color: "muted" },
   ]);
+});
+
+test("money row: plan savings fragment — 30DAY api-eq minus zai.planPrice (when positive)", () => {
+  const row = createMoneyRow();
+  const withPlan = row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
+    ledger: LEDGER,
+    config: { ...DEFAULT_CONFIG, zai: { ...DEFAULT_CONFIG.zai, planPrice: 9.5 } },
+  }), 2)!;
+  assert.deepEqual(withPlan.slice(-4), [
+    { text: " api-eq", color: "dim" },
+    { text: " ▁▁▂▄▂▁▇", color: "success" },
+    // 118.75 - 9.5 = 109.25 → rounded whole dollars at a glance
+    { text: " | plan saves $109/mo", color: "success" },
+    { text: " | $0.39/hr", color: "muted" },
+  ]);
+  // plan price above 30DAY spend → no benefit fragment yet; unset (0) → omitted
+  const below = row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
+    ledger: LEDGER,
+    config: { ...DEFAULT_CONFIG, zai: { ...DEFAULT_CONFIG.zai, planPrice: 200 } },
+  }), 2)!;
+  assert.ok(!below.some((f) => f.text.includes("plan saves")));
+  const unset = row.render(snap({
+    session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
+    ledger: LEDGER,
+  }), 2)!;
+  assert.ok(!unset.some((f) => f.text.includes("plan saves")));
 });
 
 test("money row: burn rate renders — when fewer than 2 usage entries", () => {
