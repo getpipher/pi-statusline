@@ -260,7 +260,9 @@ export function activateStatusline(
                   return `\x1b[38;2;${r};${g};${b}m${f.text}\x1b[0m`;
                 }
               }
-              return theme.fg(f.color, f.text);
+              // Non-hex preset (default/mono): remap the token, let pi's theme resolve it.
+              // The value here is provably a token (hex path returned above), not a hex string.
+              return theme.fg(applyThemeColor(f.color, themeName).color as ColorToken, f.text);
             }).join("")
           );
         },
