@@ -72,9 +72,20 @@ In `~/.pi/agent/settings.json`:
 - **`display.showVersions`** — appends `SL:<version> · PI:<version>` stamps to the
   ambient line (default off). `SL` is this package; `PI` is the linked
   `@earendil-works/pi-coding-agent` (omitted when unresolvable).
-- **`display.theme`** — named color preset: `"default"` (identity) or `"mono"`
-  (flattens `success`/`toolTitle`/`accent` to `text`, keeping escalation bands).
-  Unknown values fall back to `default` with a one-time warning.
+- **`display.theme`** — named color preset. `"default"` (identity — pi's live
+  theme resolves every token), `"mono"` (flattens `success`/`toolTitle`/`accent`
+  to `text`, keeping escalation bands), or a full-palette truecolor preset:
+  `"gruvbox"`, `"tokyo-night"`, `"pastel"`, `"solarized"`. Palette presets emit
+  truecolor ANSI directly (bypassing pi-theme) so colors are identical across
+  hosts. Unknown values fall back to `default` with a one-time warning.
+- **`display.glyphs`** — segment decoration style: `"unicode"` (default; the
+  established marks, e.g. `⎇ main`), `"nerd"` (Nerd Font glyphs, e.g. the
+  branch icon — needs a Nerd Font terminal), or `"ascii"` (plain text, e.g.
+  `git: main`). Unknown values are ignored (default retained).
+- **`display.barStyle`** — progress-bar character style for bar-rendering
+  formats: `"blocks"` (default, `████░░░░░░`), `"rounded"` (`▰▰▰▰▰▱▱▱▱▱`),
+  `"dots"` (`●●●●●○○○○○`), `"shaded"` (`▓▓▓▓▓░░░░░`). Plumbed through the
+  render snapshot; inert until a bar format consumes it.
 - **`providers.openrouter`** — the OpenRouter credits row: `enabled` (default
   `true`; a missing `openrouter.key` in `~/.pi/agent/auth.json` leaves the row
   inert) and `pollIntervalMs` (default 600000). The row shows
