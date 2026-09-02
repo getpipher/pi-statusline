@@ -22,19 +22,20 @@ const QUOTA: QuotaResult = {
   fetchedAt: NOW,
 };
 
-test("renderZaiQuota produces the v0.4.6 window format (5HRS/7DAY label-first, per-window reset)", () => {
+test("renderZaiQuota produces the v0.4.7 window format (no label, countdown in parens)", () => {
   // 5h window: reset = NOW+2h55m → elapsed 2h05m of 5h = 42%; weekly: 6d of 7d elapsed = 86%,
-  // reset NOW+24h → "24h0m".
+  // reset NOW+24h → "24h 0m". The `zai` prefix and credits ceiling are gone (RECTOR, FB7):
+  // the parenthetical IS the reset countdown (pomodoro time).
   assert.equal(
     renderZaiQuota(QUOTA, NOW),
-    "zai 5HRS 75%/42% (2.0k) reset 2h55m | 7DAY 15%/86% (10k) reset 24h0m",
+    "5HRS 75%/42% (2h 55m) | 7DAY 15%/86% (24h 0m)",
   );
 });
 
 test("renderZaiQuota falls back to weekly when 5h window is missing", () => {
   const weeklyOnly = { ...QUOTA, fiveHour: null } as QuotaResult;
   const out = renderZaiQuota(weeklyOnly, NOW);
-  assert.ok(out.startsWith("zai 7DAY 15%/86% (10k)"), out);
+  assert.ok(out.startsWith("7DAY 15%/86%"), out);
   assert.ok(!out.includes("5HRS"));
 });
 
@@ -43,8 +44,8 @@ test("zaiSegments: per-window heat tints independently; reset rides its own wind
   assert.deepEqual(
     segs.map((s) => ({ text: s.text, heat: s.heat, color: s.color })),
     [
-      { text: "zai 5HRS 75%/42% (2.0k) reset 2h55m", heat: 75, color: undefined },
-      { text: " | 7DAY 15%/86% (10k) reset 24h0m", heat: 15, color: undefined },
+      { text: "5HRS 75%/42% (2h 55m)", heat: 75, color: undefined },
+      { text: " | 7DAY 15%/86% (24h 0m)", heat: 15, color: undefined },
     ],
   );
 });
@@ -74,8 +75,8 @@ test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent;
   const row = createQuotaRow([adapter]);
   const frags = row.render(snap({}), 2)!;
   assert.deepEqual(frags, [
-    { text: "zai 5HRS 75%/42% (2.0k) reset 2h55m", color: "warning" },
-    { text: " | 7DAY 15%/86% (10k) reset 24h0m", color: "accent" },
+    { text: "5HRS 75%/42% (2h 55m)", color: "warning" },
+    { text: " | 7DAY 15%/86% (24h 0m)", color: "accent" },
   ]);
 });
 
