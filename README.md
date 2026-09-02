@@ -14,7 +14,7 @@ the deen line tracks the five daily prayers with a live next-prayer countdown.
 ```
 v2-p1 pi-statusline ⎇ main* ↑2 ↓1 | glm-5.2
 ctx 34% 68k/200k | ↑48k ↓6.2k | cache 68%
-REPO $12.34 | $1.24 sess | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75 api-eq ▁▁▂▄▂▁▇ | plan saves $109/mo | $0.39/hr
+REPO $12.34 | $1.24 sess | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75 api-eq ▁▁▂▄▂▁▇ | $0.39/hr
 zai 75%/42% 5h (2.0k) | 7DAY 15%/86% (10k) | reset 2h55m | est 3.6k (180%)
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
 04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4
@@ -82,12 +82,9 @@ In `~/.pi/agent/settings.json`:
   `or $X.XX left · $X.XX today · top: <model> $X.XX` — `today`/`top` come from
   the **local ledger's** attributed spend (the credits API has no per-window or
   per-model breakdown).
-- **`zai.planPrice`** — monthly USD price of your flat Coding Plan. When set and the
-  30DAY rolling API-equivalent exceeds it, the money row renders
-  `| plan saves $X/mo` (whole dollars). `0`/unset = omitted. The `api-eq` marker on the
-  30DAY fragment always renders: the `$` meter is **tokens × published API rates** —
-  what the same usage would cost on pay-as-you-go — so the comparison vs your flat plan
-  is visible at a glance. Understated while the ledger is younger than 30 days.
+  The `api-eq` marker on the 30DAY fragment marks the `$` meter as **tokens × published
+  API rates** — what the same usage would cost on pay-as-you-go; REPO carries the same
+  calculation, repo-scoped and all-time.
 - **`deen`** — prayer-tracker settings (see **Deen** below). `city` may be
   `"auto"` for IP-based geolocation; `method` is the [aladhan calculation
   method](https://aladhan.com/calculation-methods) ("auto" = aladhan default);
