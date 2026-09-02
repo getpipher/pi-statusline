@@ -36,6 +36,8 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     deen: null,
     git: null,
     versions: { sl: "", pi: null },
+    glyphStyle: "unicode",
+    barStyle: "blocks",
     ...partial,
   };
 }

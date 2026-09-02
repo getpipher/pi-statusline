@@ -17,6 +17,8 @@ export interface RowSnapshot {
   deen: DeenSnapshot | null; // P2 — null until DeenSource provides data (row omitted)
   git: GitSnapshot | null; // Task 7 — declare NOW with the type import so Task 5/7 share one snapshot migration
   versions: { sl: string; pi: string | null }; // SL = our package, PI = linked host package (null = unresolved)
+  glyphStyle: "nerd" | "unicode" | "ascii"; // segment decoration style (visual upgrade)
+  barStyle: "blocks" | "rounded" | "dots" | "shaded"; // progress bar character style
   order?: RowId[]; // optional echo of the display order (unused by rows; kept for debugging)
 }
 

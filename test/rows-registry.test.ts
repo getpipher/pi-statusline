@@ -44,6 +44,8 @@ function makeSnapshot(width: number): RowSnapshot {
     deen: null,
     git: null,
     versions: { sl: "", pi: null },
+    glyphStyle: "unicode",
+    barStyle: "blocks",
     order: [...ORDER],
   };
 }

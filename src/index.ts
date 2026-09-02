@@ -238,6 +238,8 @@ export function activateStatusline(
             deen: deenSource.current(),
             git: gitSource.get(),
             versions: dependencies.readVersions(),
+            glyphStyle: config.display.glyphs,
+            barStyle: config.display.barStyle,
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           // Theme validation at use (mirrors unknown-row handling): one-time notify.
