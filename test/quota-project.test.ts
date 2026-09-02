@@ -1,7 +1,7 @@
 // test/quota-project.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { projectBlock } from "../src/quota/project.ts";
+import { projectBlock, windowElapsedPercent, FIVE_HOUR_MS, WEEK_MS } from "../src/quota/project.ts";
 import type { QuotaResult } from "../src/quota/zai.ts";
 
 const RESET = Date.UTC(2026, 8, 2, 12, 0); // block resets 12:00Z
@@ -47,4 +47,16 @@ test("usage ≤ 0 or non-finite fields → null (defensive)", () => {
   const bad = data(500, 2000);
   bad.fiveHour!.nextResetTime = Number.NaN;
   assert.equal(projectBlock(bad, START + 3_600_000), null);
+});
+
+test("windowElapsedPercent: window clock percent, clamped 0–100", () => {
+  // 4h elapsed of 5h → 80% (RECTOR's example: 1h remaining → 80%)
+  assert.equal(windowElapsedPercent(START + FIVE_HOUR_MS, FIVE_HOUR_MS, START + 4 * 3_600_000), 80);
+  // weekly: 1d elapsed of 7d → 14% (round(14.28))
+  assert.equal(windowElapsedPercent(START + WEEK_MS, WEEK_MS, START + 24 * 3_600_000), 14);
+  // before window start → 0; after reset → 100 (stale clamps, never negative/over)
+  assert.equal(windowElapsedPercent(START + FIVE_HOUR_MS, FIVE_HOUR_MS, START - 1), 0);
+  assert.equal(windowElapsedPercent(START, FIVE_HOUR_MS, START + FIVE_HOUR_MS + 1), 100);
+  // non-finite now → 0 (defensive)
+  assert.equal(windowElapsedPercent(START + FIVE_HOUR_MS, FIVE_HOUR_MS, Number.NaN), 0);
 });
