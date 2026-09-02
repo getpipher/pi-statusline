@@ -21,6 +21,12 @@ export function createAmbientRow(): Row {
         if (detail >= 2 && snapshot.statuses) {
           frags.push({ text: ` | ${snapshot.statuses}`, color: "dim" });
         }
+        // Version stamps (spec §15): SL = our package, PI = linked pi host package.
+        // Periphery → dim, detail-2 only, off unless display.showVersions.
+        if (detail >= 2 && snapshot.config.display.showVersions && snapshot.versions.sl) {
+          frags.push({ text: ` | SL:${snapshot.versions.sl}`, color: "dim" });
+          if (snapshot.versions.pi) frags.push({ text: ` · PI:${snapshot.versions.pi}`, color: "dim" });
+        }
       }
       return frags;
     },

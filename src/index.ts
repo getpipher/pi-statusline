@@ -18,6 +18,7 @@ import { createAmbientRow } from "./rows/ambient.ts";
 import { createDeenRow } from "./rows/deen.ts";
 import { createDeenSource, type DeenSource } from "./deen/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
+import { selfVersion, piVersion } from "./versions.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
@@ -33,6 +34,7 @@ export interface StatuslineRuntimeDependencies {
   readKey: typeof readZaiKey;
   makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
   makeDeenSource: (deps: { cachePath: string; config: () => StatuslineConfig }) => DeenSource;
+  readVersions: () => { sl: string; pi: string | null };
 }
 
 const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
@@ -45,6 +47,7 @@ const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
     createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
   ],
   makeDeenSource: ({ cachePath, config }) => createDeenSource({ cachePath, config: () => config().deen }),
+  readVersions: () => ({ sl: selfVersion(), pi: piVersion() }),
 };
 
 export function activateStatusline(
@@ -192,6 +195,7 @@ export function activateStatusline(
             deen: deenSource.current(),
             git: null,
             quotaWindow,
+            versions: dependencies.readVersions(),
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           // One theme pass: fragment colors → theme.fg; fragments own all spacing.

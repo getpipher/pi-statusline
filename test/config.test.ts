@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session" },
+    display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false },
   });
 });
 
@@ -84,6 +84,19 @@ test("display.burnAnchor parses session|block, defaults session, throws on inval
   const badPath = join(tmpDir, "bad.json");
   writeFileSync(badPath, JSON.stringify({ display: { burnAnchor: "hourly" } }));
   assert.throws(() => loadConfig(badPath), /burnAnchor must be "session" or "block"/);
+});
+
+test("display.showVersions lenient boolean, defaults false (showTokens precedent)", () => {
+  const defPath = join(tmpDir, "versions-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.equal(loadConfig(defPath).config.display.showVersions, false);
+  const onPath = join(tmpDir, "versions-on.json");
+  writeFileSync(onPath, JSON.stringify({ display: { showVersions: true } }));
+  assert.equal(loadConfig(onPath).config.display.showVersions, true);
+  // non-boolean → ignored, default retained (lenient, showTokens pattern)
+  const badPath = join(tmpDir, "versions-bad.json");
+  writeFileSync(badPath, JSON.stringify({ display: { showVersions: "yes" } }));
+  assert.equal(loadConfig(badPath).config.display.showVersions, false);
 });
 
 test("saveConfig writes valid JSON readable by loadConfig", () => {

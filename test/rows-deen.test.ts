@@ -36,6 +36,7 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     deen: null,
     git: null,
     quotaWindow: null,
+    versions: { sl: "", pi: null },
     ...partial,
   };
 }

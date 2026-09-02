@@ -24,6 +24,7 @@ export interface StatuslineConfig {
     showGit: boolean;
     showSession: boolean;
     burnAnchor: "session" | "block"; // $/hr anchor: session span (default) or zai 5h block
+    showVersions: boolean; // ambient SL/PI stamps (spec §15), default off
   };
 }
 
@@ -45,6 +46,7 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
     showGit: true,
     showSession: true,
     burnAnchor: "session",
+    showVersions: false,
   },
 };
 
@@ -102,6 +104,7 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.showSession === "boolean") cfg.display.showSession = d.showSession;
     if (typeof d.bars === "boolean") cfg.display.bars = d.bars;
     if (typeof d.sparkline === "boolean") cfg.display.sparkline = d.sparkline;
+    if (typeof d.showVersions === "boolean") cfg.display.showVersions = d.showVersions;
     if (typeof d.burnAnchor === "string") {
       if (d.burnAnchor !== "session" && d.burnAnchor !== "block") {
         throw new Error('burnAnchor must be "session" or "block"');

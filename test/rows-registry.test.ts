@@ -44,6 +44,7 @@ function makeSnapshot(width: number): RowSnapshot {
     deen: null,
     git: null,
     quotaWindow: null,
+    versions: { sl: "", pi: null },
     order: [...ORDER],
   };
 }

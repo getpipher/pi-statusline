@@ -18,6 +18,7 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     deen: null,
     git: null,
     quotaWindow: null,
+    versions: { sl: "0.4.0", pi: "0.84.4" },
     ...partial,
   };
 }
@@ -357,4 +358,24 @@ test("money row block anchor falls back to session when window missing/young/sta
     now: Date.UTC(2026, 7, 30, 9, 30),
   });
   assert.ok(createMoneyRow().render(s3, 1)!.some((f) => f.text === " | $99.00/hr"));
+});
+
+// ── Task 6: version stamps ──
+
+test("ambient versions fragment: gated by showVersions + detail 2; PI omitted when null", () => {
+  const row = createAmbientRow();
+  const cfg = { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, showVersions: true } };
+  const on = row.render(snap({ config: cfg, session: session({}) }), 2)!;
+  assert.deepEqual(on.slice(-2), [
+    { text: " | SL:0.4.0", color: "dim" },
+    { text: " · PI:0.84.4", color: "dim" },
+  ]);
+  const noPi = row.render(snap({ config: cfg, session: session({}), versions: { sl: "0.4.0", pi: null } }), 2)!;
+  assert.deepEqual(noPi.slice(-1), [{ text: " | SL:0.4.0", color: "dim" }]);
+  // off by default
+  const off = row.render(snap({ session: session({}) }), 2)!;
+  assert.ok(!off.some((f) => f.text.includes("SL:")));
+  // detail 1 → omitted (periphery, same gate as statuses)
+  const d1 = row.render(snap({ config: cfg, session: session({}) }), 1)!;
+  assert.ok(!d1.some((f) => f.text.includes("SL:")));
 });
