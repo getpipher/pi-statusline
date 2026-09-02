@@ -623,3 +623,61 @@ test("v2 P3 wiring: rows command persists display order and notifies", async () 
     rmSync(h.tmp, { recursive: true, force: true });
   }
 });
+
+// ── v2 P3 integration sweep: the assembled footer across the whole P3 surface ──
+
+test("v2 P3 sweep: est + block burn + git marks + versions + mono, one render", async () => {
+  const h = makeHarness();
+  try {
+    // Entries inside the active 5h window (block burn needs ledger cost there).
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{
+      timestamp: string;
+      message: { usage: { cost: { total: number } } };
+    }>;
+    entries[0]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[0]!.message.usage.cost = { total: 0.5 };
+    entries[1]!.message.usage.cost = { total: 1.0 };
+
+    writeFileSync(h.configPath, JSON.stringify({
+      display: { showVersions: true, burnAnchor: "block", theme: "mono" },
+    }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    h.git.set({ dirty: true, ahead: 2, behind: 1, commitsToday: 4 });
+
+    h.colors.length = 0;
+    const lines = h.footerHolder.current!.render(500);
+    const flat = lines.join("\n");
+
+    // identity: branch + dirty mark + ahead/behind
+    assert.match(flat, /⎇ main\* ↑2 ↓1/, "git marks beside the branch");
+    // quota: est projection fragment rides the active provider's line
+    const quotaLine = lines.find((l) => l.includes("zai-quota-line"));
+    assert.ok(quotaLine, "quota line present");
+    assert.match(quotaLine, / \| est \d+(\.\d+)?k \(\d+%\)/, `est fragment: ${quotaLine}`);
+    // money: block-anchored burn (1.5 over ≈4h — see the Task 5 wiring test for the bounds)
+    const moneyLine = lines.find((l) => l.includes(" sess"));
+    assert.ok(moneyLine, "money line present");
+    assert.match(moneyLine, /\$0\.37\/hr/, `block burn: ${moneyLine}`);
+    // ambient: commits-today + version stamps
+    const ambientLine = lines.find((l) => l.includes("commits 4"));
+    assert.ok(ambientLine, "commits-today on ambient line");
+    assert.match(ambientLine, /SL:\d/, "SL stamp on the same line");
+    // mono: no hue tokens reach theme.fg; flattened tokens land on text
+    const colorNames = new Set(h.colors.map((c) => c.color));
+    assert.ok(!colorNames.has("success") && !colorNames.has("toolTitle"), `mono flattens hues, saw: ${[...colorNames]}`);
+    assert.ok(colorNames.has("text"), "flattened tokens land on text");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
