@@ -137,13 +137,11 @@ const CTX_SESSION = session({
   contextPercent: 34,
 });
 
-test("ctx row: bar + percent + window + tokens + cache hit (detail 2; empty cells muted)", () => {
+test("ctx row: percent + window + tokens + cache hit (detail 2; bar removed v0.4.1)", () => {
   const row = createContextRow();
   const frags = row.render(snap({ session: CTX_SESSION }), 2)!;
   assert.deepEqual(frags, [
     { text: "ctx", color: "dim" },
-    { text: " ▕███", color: "accent" },
-    { text: "░░░░░░░▏", color: "muted" },
     { text: " 34%", color: "text" },
     { text: " 68k/200k", color: "text" },
     { text: " | ↑48k ↓6.2k", color: "toolTitle" },
@@ -161,12 +159,12 @@ test("ctx row: detail 1 drops window + cache; detail 0 drops tokens too", () => 
   assert.ok(!zero.includes("↑") && !zero.includes("cache"), "detail 0: no tokens, no cache");
 });
 
-test("ctx row: bar tints warning at ≥70% and error at ≥90%", () => {
+test("ctx row: no bar fragments at any detail (v0.4.1 bar removal)", () => {
   const row = createContextRow();
-  const warn = row.render(snap({ session: { ...CTX_SESSION, contextPercent: 75 } }), 2)!;
-  assert.equal(warn[1]!.color, "warning");
-  const err = row.render(snap({ session: { ...CTX_SESSION, contextPercent: 91 } }), 2)!;
-  assert.equal(err[1]!.color, "error");
+  for (const pct of [34, 75, 91]) {
+    const frags = row.render(snap({ session: { ...CTX_SESSION, contextPercent: pct } }), 2)!;
+    assert.ok(!frags.some((f) => f.text.includes("╳") || f.text.includes("░")), `no bar cells at ${pct}%`);
+  }
 });
 
 test("ctx row: cache hit uses cacheRead/(cacheRead+input); omitted when denominator 0", () => {
