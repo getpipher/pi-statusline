@@ -67,6 +67,19 @@ test("identity row: detail 1 drops repo; detail 0 keeps name + model only", () =
   assert.equal(noNameZero, "glm-5.2", "unset name → bare model at detail 0 (no orphan separator)");
 });
 
+test("identity row: glyphStyle selects the branch mark (unicode default, nerd, ascii)", () => {
+  const row = createIdentityRow();
+  // unicode (default): identical to the established ⎇ mark
+  const uni = plain(row.render(snap({ session: session({}) }), 1)!);
+  assert.ok(uni.includes("⎇ main"), `unicode default keeps ⎇: ${uni}`);
+  // nerd: Nerd Font branch glyph
+  const nerd = plain(row.render(snap({ session: session({}), glyphStyle: "nerd" }), 1)!);
+  assert.ok(nerd.includes("\ue725 main"), `nerd glyph present: ${JSON.stringify(nerd)}`);
+  // ascii: plain ASCII prefix
+  const ascii = plain(row.render(snap({ session: session({}), glyphStyle: "ascii" }), 1)!);
+  assert.ok(ascii.includes("git: main"), `ascii prefix present: ${ascii}`);
+});
+
 test("identity row: thinking level is a detail>=1 shrink casualty; off renders dim", () => {
   const row = createIdentityRow();
   const high = session({ thinkingLevel: "high" });

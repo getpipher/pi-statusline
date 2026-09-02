@@ -20,7 +20,7 @@ const NERD: GlyphTable = {
 };
 
 const UNICODE: GlyphTable = {
-  git_branch: "\u2442",
+  git_branch: "\u2387", // ⎇ — matches the identity row's established mark
   git_dirty: "*",
   git_ahead: "\u2191",
   git_behind: "\u2193",

@@ -1,4 +1,5 @@
 // src/rows/identity.ts
+import { getGlyph } from "../glyphs.ts";
 import type { Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
@@ -25,7 +26,7 @@ export function createIdentityRow(): Row {
       }
       if (detail >= 2) frags.push({ text: `${frags.length > 0 ? " " : ""}${s.repoName}`, color: "dim" });
       if (s.branch && detail >= 1) {
-        frags.push({ text: `${frags.length > 0 ? " " : ""}⎇ ${s.branch}`, color: "toolTitle" });
+        frags.push({ text: `${frags.length > 0 ? " " : ""}${getGlyph("git_branch", snapshot.glyphStyle)} ${s.branch}`, color: "toolTitle" });
         const g = snapshot.git;
         if (g) {
           if (g.dirty) frags.push({ text: "*", color: "toolTitle" });
