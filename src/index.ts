@@ -17,6 +17,7 @@ import { createQuotaRow } from "./rows/quota.ts";
 import { createAmbientRow } from "./rows/ambient.ts";
 import { createDeenRow } from "./rows/deen.ts";
 import { createDeenSource, type DeenSource } from "./deen/source.ts";
+import { createGitSource, type GitSource } from "./git/source.ts";
 import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
@@ -34,6 +35,7 @@ export interface StatuslineRuntimeDependencies {
   readKey: typeof readZaiKey;
   makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
   makeDeenSource: (deps: { cachePath: string; config: () => StatuslineConfig }) => DeenSource;
+  makeGitSource: (deps: { onUpdate: () => void }) => GitSource;
   readVersions: () => { sl: string; pi: string | null };
 }
 
@@ -47,6 +49,9 @@ const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
     createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
   ],
   makeDeenSource: ({ cachePath, config }) => createDeenSource({ cachePath, config: () => config().deen }),
+  // onUpdate threaded in (not closed over) — requestRenderFn lives inside
+  // activateStatusline; makeAdapters/makeDeenSource follow the same deps-arg pattern.
+  makeGitSource: ({ onUpdate }) => createGitSource({ onUpdate }),
   readVersions: () => ({ sl: selfVersion(), pi: piVersion() }),
 };
 
@@ -76,6 +81,10 @@ export function activateStatusline(
     config: () => config,
   });
   let lastDeenRefresh = 0;
+  // GitSource mirrors the deen lifecycle: one source per activation, async refresh,
+  // rows read get() synchronously per render (null-tolerant: a failed re-probe
+  // degrades the rows to no marks — accepted P3-5 behavior).
+  const gitSource = dependencies.makeGitSource({ onUpdate: () => requestRenderFn?.() });
   // Cheap throttle: the 30s ticker must not hammer the API (refresh is cache-first,
   // but a no-op call is still a disk read + freshness check).
   const deenNeedsRefresh = (): boolean => Date.now() - lastDeenRefresh > 60_000;
@@ -130,6 +139,7 @@ export function activateStatusline(
           ensureLedger().reconcile(sessionCtx.sessionManager.getEntries());
         }
         if (deenNeedsRefresh()) refreshDeen();
+        gitSource.refresh(); // TTL-guarded internally
         requestRenderFn?.();
       },
     });
@@ -155,7 +165,10 @@ export function activateStatusline(
     if (footerInstalled) return;
     ctx.ui.setFooter((tui, theme, footerData) => {
       requestRenderFn = () => tui.requestRender();
-      const unsub = footerData.onBranchChange(() => tui.requestRender());
+      const unsub = footerData.onBranchChange(() => {
+        gitSource.refresh(true);
+        tui.requestRender();
+      });
 
       return {
         dispose: () => {
@@ -193,7 +206,7 @@ export function activateStatusline(
             statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
             deen: deenSource.current(),
-            git: null,
+            git: gitSource.get(),
             quotaWindow,
             versions: dependencies.readVersions(),
           };
@@ -234,6 +247,7 @@ export function activateStatusline(
       drainRowWarnings();
       startTicker();
       refreshDeen(); // async, off the render path — print-mode safe (no new timers)
+      gitSource.refresh(true); // forced: branch switched — state may differ immediately
     }
   });
 

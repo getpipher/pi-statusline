@@ -379,3 +379,29 @@ test("ambient versions fragment: gated by showVersions + detail 2; PI omitted wh
   const d1 = row.render(snap({ config: cfg, session: session({}) }), 1)!;
   assert.ok(!d1.some((f) => f.text.includes("SL:")));
 });
+
+// ── Task 7: git wiring ──
+
+test("identity row: dirty * and ahead/behind ride the branch fragment (detail >= 1 only)", () => {
+  const row = createIdentityRow();
+  const g = { dirty: true, ahead: 2, behind: 1, commitsToday: 4 };
+  const frags = row.render(snap({ session: session({ branch: "main" }), git: g }), 2)!;
+  assert.deepEqual(frags[2], { text: " ⎇ main", color: "toolTitle" });
+  assert.deepEqual(frags[3], { text: "*", color: "toolTitle" });
+  assert.deepEqual(frags[4], { text: " ↑2 ↓1", color: "toolTitle" });
+  // clean + no upstream → no extra fragments (model follows the branch directly)
+  const clean = row.render(snap({ session: session({ branch: "main" }), git: { dirty: false, ahead: null, behind: null, commitsToday: 0 } }), 2)!;
+  assert.deepEqual(clean[3], { text: " | glm-5.2", color: "accent" });
+  assert.equal(clean.length, 4);
+  // detail 1 with branch → marks still render; detail 0 (no branch) → none
+  assert.ok(row.render(snap({ session: session({ branch: "main" }), git: g }), 1)!.some((f) => f.text === "*"));
+  assert.ok(!row.render(snap({ session: session({ branch: "main" }), git: g }), 0)!.some((f) => f.text === "*"));
+});
+
+test("ambient row: commits-today fragment at detail >= 1, dim", () => {
+  const row = createAmbientRow();
+  const frags = row.render(snap({ session: session({}), git: { dirty: false, ahead: null, behind: null, commitsToday: 4 } }), 1)!;
+  assert.ok(frags.some((f) => f.text === " | commits 4" && f.color === "dim"));
+  const none = row.render(snap({ session: session({}), git: { dirty: false, ahead: null, behind: null, commitsToday: null } }), 1)!;
+  assert.ok(!none.some((f) => f.text.includes("commits")));
+});

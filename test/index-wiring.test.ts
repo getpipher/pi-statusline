@@ -74,8 +74,9 @@ function makeHarness() {
   const footerData = {
     getGitBranch: () => "main",
     getExtensionStatuses: () => statuses,
-    onBranchChange: (_callback: () => void) => () => {},
+    onBranchChange: (callback: () => void) => { branchChangeCallback = callback; return () => {}; },
   };
+  let branchChangeCallback: (() => void) | null = null;
 
   const model = {
     provider: "zai",
@@ -123,6 +124,14 @@ function makeHarness() {
     on: (event: string, handler: Handler) => handlers.set(event, handler),
     registerCommand: (name: string, command: Command) => commands.set(name, command),
   };
+
+  // Controllable fake git source (Task 7): data set by the test, refreshes recorded.
+  const gitRefreshes: Array<boolean | undefined> = [];
+  let gitData: import("../src/git/source.ts").GitSnapshot | null = null;
+  const fakeGitSource = {
+    refresh: (force?: boolean) => { gitRefreshes.push(force); },
+    get: () => gitData,
+  };
   const pi = piObject as unknown as ExtensionAPI;
 
   let started = 0;
@@ -141,7 +150,13 @@ function makeHarness() {
   return {
     tmp, configPath, handlers, commands, colors, notifications, renderRequests: () => renderRequests,
     setFooterCalls: () => setFooterCalls, footerHolder, ctxObject, ctx, pi,
-    fakeZaiAdapter, counters: { get started() { return started; }, get stopped() { return stopped; }, get fetched() { return fetched; } },
+    fakeZaiAdapter, fakeGitSource,
+    git: {
+      set: (d: import("../src/git/source.ts").GitSnapshot | null) => { gitData = d; },
+      refreshes: () => [...gitRefreshes],
+      triggerBranchChange: () => branchChangeCallback?.(),
+    },
+    counters: { get started() { return started; }, get stopped() { return stopped; }, get fetched() { return fetched; } },
   };
 }
 
@@ -153,6 +168,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
     });
 
@@ -203,6 +219,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
           configPath: h2.configPath,
           ledgerPath: join(h2.tmp, "ledger.jsonl"),
           readKey: () => "fixture-key",
+          makeGitSource: () => h2.fakeGitSource,
           makeAdapters: () => [{ ...h2.fakeZaiAdapter, current: () => null }],
         });
         h2.handlers.get("session_start")?.({}, h2.ctx);
@@ -261,6 +278,7 @@ test("v2 wiring: multi-line render, matrix dimming, ledger, commands, dispose", 
           configPath: h3.configPath,
           ledgerPath: join(h3.tmp, "ledger.jsonl"),
           readKey: () => "fixture-key",
+          makeGitSource: () => h3.fakeGitSource,
           makeAdapters: () => [h3.fakeZaiAdapter],
         });
         h3.handlers.get("session_start")?.({}, h3.ctx);
@@ -327,6 +345,7 @@ test("v2 P2 wiring: deen source flows to the footer; session_start + deen comman
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
       deenCachePath: join(h.tmp, "deen-cache.json"),
       makeDeenSource: () => fakeDeen,
@@ -389,6 +408,7 @@ test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
       deenCachePath: join(h.tmp, "deen-cache.json"),
       makeDeenSource: () => fakeNull,
@@ -426,6 +446,7 @@ test("v2 P3 wiring: burnAnchor block derives $/hr from quotaWindow cost", async 
       configPath: h.configPath,
       ledgerPath: join(h.tmp, "ledger.jsonl"),
       readKey: () => "fixture-key",
+          makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
     });
     h.handlers.get("session_start")?.({}, h.ctx);
@@ -437,6 +458,44 @@ test("v2 P3 wiring: burnAnchor block derives $/hr from quotaWindow cost", async 
     // session formula (session span ≈ 0 would render a huge $/hr). δ would need to
     // exceed 394 s to flip the rounding — impossible for a single test run.
     assert.match(moneyLine, /\$0\.37\/hr/, `block burn on money line: ${moneyLine}`);
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+// ── v2 P3 wiring: GitSource — refresh triggers + snapshot passthrough to rows ──
+
+test("v2 P3 wiring: git source refreshes on session_start/branch change and feeds the rows", async () => {
+  const h = makeHarness();
+  try {
+    writeFileSync(h.configPath, JSON.stringify({}));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    // session_start forces a git refresh
+    assert.deepEqual(h.git.refreshes(), [true], "session_start → refresh(true)");
+
+    // no data yet → no git marks anywhere
+    const bare = h.footerHolder.current!.render(500).join("\n");
+    assert.ok(!bare.includes("*") || !bare.includes("⎇ main*"), "no marks before data");
+
+    // simulated data arrival → render picks up get() through the snapshot
+    h.git.set({ dirty: true, ahead: 2, behind: 1, commitsToday: 4 });
+    const flat = h.footerHolder.current!.render(500).join("\n");
+    assert.match(flat, /⎇ main\* ↑2 ↓1/, "identity marks from snapshot.git");
+    assert.match(flat, /\| commits 4/, "ambient commits-today from snapshot.git");
+
+    // branch change → forced refresh + repaint
+    const before = h.git.refreshes().length;
+    h.git.triggerBranchChange();
+    assert.deepEqual(h.git.refreshes().slice(before), [true], "onBranchChange → refresh(true)");
+    assert.ok(h.renderRequests() > 0, "onBranchChange still requests a render");
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });

@@ -11,6 +11,10 @@ export function createAmbientRow(): Row {
       const frags: Fragment[] = [{ text: formatClock(snapshot.now), color: "dim" }];
       if (detail >= 1) {
         frags.push({ text: ` | coding ${formatSpan(snapshot.session.spanMs)}`, color: "dim" });
+        const g = snapshot.git;
+        if (g && g.commitsToday !== null) {
+          frags.push({ text: ` | commits ${g.commitsToday}`, color: "dim" });
+        }
         // Hijri date + city moved here from the deen strip (RECTOR) — muted, deen-gated.
         if (snapshot.deen) {
           frags.push({ text: ` | ${snapshot.deen.hijri}`, color: "muted" });
