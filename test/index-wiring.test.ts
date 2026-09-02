@@ -691,10 +691,16 @@ test("final-fix: session attribution flows ctx → store → adapter (OR today f
     let injectedLedger: LedgerGetter | undefined;
     // providerTodayCost scopes to TODAY's local-day bucket — timestamp the fixture
     // entries into the current day (the same mutation the Task-5/11 wiring tests use).
+    // Midnight-safe anchor (P3-36): a raw `now - 2h` falls into YESTERDAY when the suite
+    // runs between local 00:00 and 02:00 — anchor to local midnight + 90min instead, so
+    // both entries stay in today's bucket at any run time (no-op during daytime).
     const now = Date.now();
+    const d = new Date(now);
+    const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const anchor = Math.max(now - 3_600_000, localMidnight + 90 * 60_000);
     const entries = h.ctxObject.sessionManager.getEntries() as Array<{ timestamp: string }>;
-    entries[0]!.timestamp = new Date(now - 3_600_000).toISOString();
-    entries[1]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    entries[0]!.timestamp = new Date(anchor).toISOString();
+    entries[1]!.timestamp = new Date(anchor - 3_600_000).toISOString();
     const fakeOr: ProviderRowAdapter<Record<string, never>> = {
       id: "openrouter",
       matches: (p) => p === "openrouter",
