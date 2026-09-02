@@ -198,9 +198,9 @@ test("money row: sess/day/7d/30d + sparkline + burn rate", () => {
   assert.deepEqual(frags, [
     { text: "REPO $12.34", color: "text" },
     { text: " | $1.24 sess", color: "text" },
-    { text: " | $8.40 day", color: "success" },
-    { text: " | $31.20 7d", color: "success" },
-    { text: " | $118.75 30d", color: "success" },
+    { text: " | DAY $8.40", color: "success" },
+    { text: " | 7DAY $31.20", color: "success" },
+    { text: " | 30DAY $118.75", color: "success" },
     { text: " ▁▁▂▄▂▁▇", color: "success" },
     { text: " | $0.39/hr", color: "muted" },
   ]);
@@ -228,7 +228,7 @@ test("money row: sparkline omitted when display.sparkline=false", () => {
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
     ledger: LEDGER,
   }), 1));
-  assert.ok(one.includes("REPO $12.34") && one.includes("$1.24 sess") && one.includes("$8.40 day") && one.includes("$0.39/hr"), `detail 1: ${one}`);
+  assert.ok(one.includes("REPO $12.34") && one.includes("$1.24 sess") && one.includes("DAY $8.40") && one.includes("$0.39/hr"), `detail 1: ${one}`);
   assert.ok(!one.includes("7d") && !one.includes("30d") && !one.includes("▁"), "detail 1: no 7d/30d/sparkline");
   const zero = plain(row.render(snap({
     session: session({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 1.24, count: 2 } }),
