@@ -5,6 +5,7 @@ import type { StatuslineConfig } from "../config.ts";
 import type { SessionSnapshot } from "../session/store.ts";
 import type { LedgerSnapshot } from "../ledger/store.ts";
 import type { DeenSnapshot } from "../deen/source.ts";
+import type { GitSnapshot } from "../git/source.ts";
 
 export interface RowSnapshot {
   now: number;
@@ -14,6 +15,8 @@ export interface RowSnapshot {
   statuses: string;
   config: StatuslineConfig;
   deen: DeenSnapshot | null; // P2 — null until DeenSource provides data (row omitted)
+  git: GitSnapshot | null; // Task 7 — declare NOW with the type import so Task 5/7 share one snapshot migration
+  quotaWindow: { startMs: number; endMs: number; cost: number } | null;
   order?: RowId[]; // optional echo of the display order (unused by rows; kept for debugging)
 }
 

@@ -402,3 +402,43 @@ test("v2 P2 wiring: null deen snapshot → row omitted, no crash", async () => {
     rmSync(h.tmp, { recursive: true, force: true });
   }
 });
+
+// ── v2 P3 wiring: burnAnchor "block" — $/hr from the zai 5h window + ledger.costSince ──
+
+test("v2 P3 wiring: burnAnchor block derives $/hr from quotaWindow cost", async () => {
+  const h = makeHarness();
+  try {
+    // Window: QUOTA.fiveHour.nextResetTime = (module-load) now + 1h → window ≈ [now−4h, now+1h].
+    // Put both usage entries inside that window (now−2h, now−1h) with cost 0.5 + 1.0.
+    const now = Date.now();
+    const entries = h.ctxObject.sessionManager.getEntries() as Array<{
+      timestamp: string;
+      message: { usage: { cost: { total: number } } };
+    }>;
+    entries[0]!.timestamp = new Date(now - 2 * 3_600_000).toISOString();
+    entries[1]!.timestamp = new Date(now - 3_600_000).toISOString();
+    entries[0]!.message.usage.cost = { total: 0.5 };
+    entries[1]!.message.usage.cost = { total: 1.0 };
+
+    writeFileSync(h.configPath, JSON.stringify({ display: { burnAnchor: "block" } }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(h.footerHolder.current, "footer installed");
+    const moneyLine = h.footerHolder.current.render(500).find((l) => l.includes(" sess"));
+    assert.ok(moneyLine, "money line present");
+    // Block cost 1.5; elapsed = renderNow − (reset − 5h) = 4h + δ where δ = module-load→render
+    // drift (≪ 1s here) → perHour = 0.37499… → "$0.37/hr" — block-derived, NOT the
+    // session formula (session span ≈ 0 would render a huge $/hr). δ would need to
+    // exceed 394 s to flip the rounding — impossible for a single test run.
+    assert.match(moneyLine, /\$0\.37\/hr/, `block burn on money line: ${moneyLine}`);
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});

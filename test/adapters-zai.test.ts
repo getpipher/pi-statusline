@@ -97,6 +97,8 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     statuses: "",
     config: DEFAULT_CONFIG,
     deen: null,
+    git: null,
+    quotaWindow: null,
     ...partial,
   };
 }

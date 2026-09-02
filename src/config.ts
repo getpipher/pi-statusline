@@ -23,6 +23,7 @@ export interface StatuslineConfig {
     showContext: boolean;
     showGit: boolean;
     showSession: boolean;
+    burnAnchor: "session" | "block"; // $/hr anchor: session span (default) or zai 5h block
   };
 }
 
@@ -43,6 +44,7 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
     showContext: true,
     showGit: true,
     showSession: true,
+    burnAnchor: "session",
   },
 };
 
@@ -100,6 +102,12 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.showSession === "boolean") cfg.display.showSession = d.showSession;
     if (typeof d.bars === "boolean") cfg.display.bars = d.bars;
     if (typeof d.sparkline === "boolean") cfg.display.sparkline = d.sparkline;
+    if (typeof d.burnAnchor === "string") {
+      if (d.burnAnchor !== "session" && d.burnAnchor !== "block") {
+        throw new Error('burnAnchor must be "session" or "block"');
+      }
+      cfg.display.burnAnchor = d.burnAnchor;
+    }
     if (Array.isArray(d.rows)) {
       const valid: RowId[] = [];
       for (const id of d.rows) {

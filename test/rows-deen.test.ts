@@ -34,6 +34,8 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     session: null as never, ledger: null as never,
     statuses: "", config: DEFAULT_CONFIG,
     deen: null,
+    git: null,
+    quotaWindow: null,
     ...partial,
   };
 }

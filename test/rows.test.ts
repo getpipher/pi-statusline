@@ -16,6 +16,8 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     statuses: "",
     config: DEFAULT_CONFIG,
     deen: null,
+    git: null,
+    quotaWindow: null,
     ...partial,
   };
 }
@@ -311,4 +313,48 @@ test("quota row est omitted for dim (inactive) provider and when projection is n
   }]);
   const frags = noFiveHour.render(snap({ now: NOW, session: session({ provider: "zai" }) }), 2)!;
   assert.equal(frags.length, 1);
+});
+
+// ── Task 5: burn anchor ──
+const BURN_BLOCK = { ...DEFAULT_CONFIG, display: { ...DEFAULT_CONFIG.display, burnAnchor: "block" as const } };
+const BURN_SESSION_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 99, count: 5 };
+
+test("money row block anchor: $/hr from quotaWindow cost over block elapsed", () => {
+  const s = snap({
+    now: Date.UTC(2026, 7, 30, 9, 0),
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 60_000 }),
+  });
+  const frags = createMoneyRow().render(s, 1)!;
+  assert.ok(frags.some((f) => f.text === " | $1.50/hr"), `expected block burn, got: ${frags.map((f) => f.text).join("")}`); // 3.0 over 2h
+});
+
+test("money row block anchor falls back to session when window missing/young/stale", () => {
+  // quotaWindow null → session formula (99 cost over 1h span)
+  const s1 = snap({
+    ledger: LEDGER,
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+  });
+  assert.ok(createMoneyRow().render(s1, 1)!.some((f) => f.text === " | $99.00/hr"));
+  // elapsed < 60s → session fallback too
+  const s2 = snap({
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 8, 59, 30), endMs: Date.UTC(2026, 7, 30, 12, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+    now: Date.UTC(2026, 7, 30, 9, 0),
+  });
+  assert.ok(createMoneyRow().render(s2, 1)!.some((f) => f.text === " | $99.00/hr"));
+  // now past endMs (stale window) → session fallback too — covers the now ≤ endMs guard
+  const s3 = snap({
+    ledger: LEDGER,
+    quotaWindow: { startMs: Date.UTC(2026, 7, 30, 7, 0), endMs: Date.UTC(2026, 7, 30, 9, 0), cost: 3.0 },
+    config: BURN_BLOCK,
+    session: session({ usage: BURN_SESSION_USAGE, spanMs: 3_600_000 }),
+    now: Date.UTC(2026, 7, 30, 9, 30),
+  });
+  assert.ok(createMoneyRow().render(s3, 1)!.some((f) => f.text === " | $99.00/hr"));
 });

@@ -8,7 +8,7 @@ import { readZaiKey } from "./quota/zai.ts";
 import { createSessionStore, type SessionStore } from "./session/store.ts";
 import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
-import type { ProviderRowAdapter } from "./adapters/types.ts";
+import { resolveQuotaAdapter, type ProviderRowAdapter } from "./adapters/types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createContextRow } from "./rows/context.ts";
@@ -172,6 +172,16 @@ export function activateStatusline(
           sessionStore.update(ctx, branch);
           const ledger = ensureLedger();
           ledger.reconcile(ctx.sessionManager.getEntries());
+          // Active 5h window (block burn anchor + est context): resolve like the quota
+          // row does, read fiveHour.nextResetTime defensively (adapters are any-typed).
+          let quotaWindow: RowSnapshot["quotaWindow"] = null;
+          const winner = resolveQuotaAdapter(adapters, sessionStore.getSnapshot().provider);
+          const winData = winner?.current() as { fiveHour?: { nextResetTime?: number } } | null | undefined;
+          const reset = winData?.fiveHour?.nextResetTime;
+          if (typeof reset === "number" && Number.isFinite(reset) && reset > Date.now()) {
+            const startMs = reset - 5 * 3_600_000;
+            quotaWindow = { startMs, endMs: reset, cost: ledger.costSince(startMs) };
+          }
           const snapshot: RowSnapshot = {
             now: Date.now(),
             width,
@@ -180,6 +190,8 @@ export function activateStatusline(
             statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean).join(" | "),
             config,
             deen: deenSource.current(),
+            git: null,
+            quotaWindow,
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           // One theme pass: fragment colors → theme.fg; fragments own all spacing.

@@ -42,6 +42,8 @@ function makeSnapshot(width: number): RowSnapshot {
     statuses: "",
     config: null as never,
     deen: null,
+    git: null,
+    quotaWindow: null,
     order: [...ORDER],
   };
 }
