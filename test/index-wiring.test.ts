@@ -501,3 +501,29 @@ test("v2 P3 wiring: git source refreshes on session_start/branch change and feed
     rmSync(h.tmp, { recursive: true, force: true });
   }
 });
+
+// ── v2 P3 wiring: makeAdapters receives the ledger getter (ensureLedger runs first) ──
+
+test("v2 P3 wiring: makeAdapters deps include a resolving ledger getter", async () => {
+  const h = makeHarness();
+  try {
+    let seen: import("../src/ledger/store.ts").LedgerStore | null | undefined;
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: (deps) => {
+        seen = deps.ledger();
+        return [h.fakeZaiAdapter];
+      },
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(seen, "ledger getter resolves to the live store (ensureLedger ran before makeAdapters)");
+    assert.equal(typeof seen!.providerTodayCost, "function", "store is the full LedgerStore (Task 1 queries present)");
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});

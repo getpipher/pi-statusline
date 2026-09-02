@@ -119,23 +119,23 @@ export async function fetchQuota(apiKey: string): Promise<QuotaResult | null> {
   }
 }
 
-export interface QuotaPollerOpts {
+export interface QuotaPollerOpts<T = unknown> {
   apiKey: string;
   intervalMs: number;
   onRefresh?: () => void;
-  /** Injection seam for tests (defaults to the real fetchQuota). */
-  fetchFn?: (apiKey: string) => Promise<QuotaResult | null>;
+  /** Typed fetch — REQUIRED since the poller genericized (Task 8). */
+  fetchFn: (apiKey: string) => Promise<T | null>;
 }
 
-export interface QuotaPoller {
-  get(): QuotaResult | null;
+export interface QuotaPoller<T = unknown> {
+  get(): T | null;
   start(): void;
   stop(): void;
   refresh(): Promise<void>;
 }
 
-export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
-  let cache: QuotaResult | null = null;
+export function createQuotaPoller<T>(opts: QuotaPollerOpts<T>): QuotaPoller<T> {
+  let cache: T | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let polling = false;
 
@@ -143,7 +143,7 @@ export function createQuotaPoller(opts: QuotaPollerOpts): QuotaPoller {
     if (polling) return;
     polling = true;
     try {
-      const doFetch = opts.fetchFn ?? fetchQuota;
+      const doFetch = opts.fetchFn;
       const result = await doFetch(opts.apiKey);
       if (result) {
         cache = result;

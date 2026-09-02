@@ -24,6 +24,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
     display: { rows: [...KNOWN_ROW_IDS], bars: true, sparkline: true, showTokens: true, showContext: true, showGit: true, showSession: true, burnAnchor: "session", showVersions: false },
+    providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
 
@@ -175,4 +176,21 @@ test("v2.1: deen section parses; escalateMinutes guarded positive; city auto all
   writeFileSync(path, JSON.stringify({ deen: { city: "auto", country: "Singapore", method: "11", escalateMinutes: -5 } }));
   const { config } = loadConfig(path);
   assert.deepEqual(config.deen, { city: "auto", country: "Singapore", method: "11", escalateMinutes: 30 });
+});
+
+test("providers.openrouter: defaults enabled/600s; lenient parses (deen block precedent)", () => {
+  const defPath = join(tmpDir, "or-default.json");
+  writeFileSync(defPath, JSON.stringify({}));
+  assert.deepEqual(loadConfig(defPath).config.providers, { openrouter: { enabled: true, pollIntervalMs: 600_000 } });
+  const onPath = join(tmpDir, "or-on.json");
+  writeFileSync(onPath, JSON.stringify({ providers: { openrouter: { enabled: false, pollIntervalMs: 120_000 } } }));
+  const cfg = loadConfig(onPath).config;
+  assert.equal(cfg.providers.openrouter.enabled, false);
+  assert.equal(cfg.providers.openrouter.pollIntervalMs, 120_000);
+  // lenient: wrong types ignored, defaults retained
+  const badPath = join(tmpDir, "or-bad.json");
+  writeFileSync(badPath, JSON.stringify({ providers: { openrouter: { enabled: "yes", pollIntervalMs: -5 } } }));
+  const bad = loadConfig(badPath).config.providers.openrouter;
+  assert.equal(bad.enabled, true);
+  assert.equal(bad.pollIntervalMs, 600_000);
 });

@@ -8,6 +8,7 @@ import { readZaiKey } from "./quota/zai.ts";
 import { createSessionStore, type SessionStore } from "./session/store.ts";
 import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
+import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
 import { resolveQuotaAdapter, type ProviderRowAdapter } from "./adapters/types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
@@ -33,7 +34,7 @@ export interface StatuslineRuntimeDependencies {
   ledgerPath: string;
   deenCachePath: string;
   readKey: typeof readZaiKey;
-  makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void }) => ProviderRowAdapter<any>[];
+  makeAdapters: (deps: { authJsonPath: string; readKey: typeof readZaiKey; config: () => StatuslineConfig; onRefresh: () => void; ledger: () => LedgerStore | null }) => ProviderRowAdapter<any>[];
   makeDeenSource: (deps: { cachePath: string; config: () => StatuslineConfig }) => DeenSource;
   makeGitSource: (deps: { onUpdate: () => void }) => GitSource;
   readVersions: () => { sl: string; pi: string | null };
@@ -45,9 +46,21 @@ const DEFAULT_DEPENDENCIES: StatuslineRuntimeDependencies = {
   ledgerPath: LEDGER_PATH,
   deenCachePath: DEEN_CACHE_PATH,
   readKey: readZaiKey,
-  makeAdapters: ({ authJsonPath, readKey, config, onRefresh }) => [
-    createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
-  ],
+  makeAdapters: ({ authJsonPath, readKey, config, onRefresh, ledger }) => {
+    const adapters: ProviderRowAdapter<any>[] = [
+      createZaiAdapter({ authJsonPath, readKey, pollIntervalMs: () => config().zai.pollIntervalMs, onRefresh }),
+    ];
+    if (config().providers.openrouter.enabled) {
+      adapters.push(createOpenRouterAdapter({
+        authJsonPath,
+        readKey: (p) => readOrKey(p), // zai-shaped dep field; OR reads its own key
+        pollIntervalMs: () => config().providers.openrouter.pollIntervalMs,
+        ledger,
+        onRefresh,
+      }));
+    }
+    return adapters;
+  },
   makeDeenSource: ({ cachePath, config }) => createDeenSource({ cachePath, config: () => config().deen }),
   // onUpdate threaded in (not closed over) — requestRenderFn lives inside
   // activateStatusline; makeAdapters/makeDeenSource follow the same deps-arg pattern.
@@ -101,12 +114,14 @@ export function activateStatusline(
   };
 
   function buildAdapters(): void {
+    ensureLedger(); // BEFORE makeAdapters — the OR adapter's ledger getter must resolve
     for (const a of adapters) a.stop();
     adapters = dependencies.makeAdapters({
       authJsonPath: dependencies.authJsonPath,
       readKey: dependencies.readKey,
       config: () => config,
       onRefresh: () => requestRenderFn?.(),
+      ledger: () => ledgerStore,
     });
     registry = createRowRegistry([
       createIdentityRow(),

@@ -15,6 +15,12 @@ export interface StatuslineConfig {
     method: string;          // "auto" → aladhan default
     escalateMinutes: number;
   };
+  providers: {
+    openrouter: {
+      enabled: boolean;
+      pollIntervalMs: number;
+    };
+  };
   display: {
     rows: RowId[];          // display order; subset/reorder of the registry, never invents
     bars: boolean;
@@ -37,6 +43,7 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
   enabled: true,
   zai: { tier: "auto", pollIntervalMs: 180_000 },
   deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
+  providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   display: {
     rows: [...KNOWN_ROW_IDS],
     bars: true,
@@ -94,6 +101,15 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.country === "string") cfg.deen.country = d.country;
     if (typeof d.method === "string") cfg.deen.method = d.method;
     if (typeof d.escalateMinutes === "number" && d.escalateMinutes > 0) cfg.deen.escalateMinutes = d.escalateMinutes;
+  }
+
+  if (parsed.providers && typeof parsed.providers === "object") {
+    const p = parsed.providers as Record<string, unknown>;
+    if (p.openrouter && typeof p.openrouter === "object") {
+      const o = p.openrouter as Record<string, unknown>;
+      if (typeof o.enabled === "boolean") cfg.providers.openrouter.enabled = o.enabled;
+      if (typeof o.pollIntervalMs === "number" && o.pollIntervalMs > 0) cfg.providers.openrouter.pollIntervalMs = o.pollIntervalMs;
+    }
   }
 
   if (parsed.display && typeof parsed.display === "object") {
