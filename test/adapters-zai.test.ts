@@ -49,6 +49,18 @@ test("zaiSegments: per-window heat (5h% and weekly% tint independently), reset d
   );
 });
 
+test("over-ceiling usage caps at 100%+ (raw heat still error-red)", async () => {
+  const over = { ...QUOTA, fiveHour: { ...QUOTA.fiveHour!, percentage: 145 } };
+  const segs = zaiSegments(over, NOW);
+  assert.equal(segs[0]!.text, "zai 100%+/42% 5h (2.0k)");
+  assert.equal(segs[0]!.heat, 145); // raw percentage → heat → error band
+  const weeklyOver = { ...QUOTA, weekly: { ...QUOTA.weekly!, percentage: 130 } };
+  assert.ok(zaiSegments(weeklyOver, NOW)[1]!.text.startsWith(" | 7DAY 100%+/86%"));
+  // boundary: exactly 100 stays a plain number
+  const atCeiling = { ...QUOTA, fiveHour: { ...QUOTA.fiveHour!, percentage: 100 } };
+  assert.ok(zaiSegments(atCeiling, NOW)[0]!.text.startsWith("zai 100%/42%"));
+});
+
 test("quota row prefers segments: 5h heat=75→warning, weekly heat=15→accent, reset dim; est appended", async () => {
   // Real adapter (segments path): per-window heat tints independently. The poller starts
   // empty — seed it through the offline fetch seam before rendering.

@@ -17,8 +17,16 @@ export interface ZaiAdapterDeps {
 // the plan's max credits for that window (console "Credits x / 28K"), NOT current burn.
 // Label placement differs per window: `5h` suffixes (window duration), `7DAY` prefixes
 // (CCS money-label style, RECTOR: drop our `wk`).
+// Usage percent display: z.ai reports >100 when usage exceeds the window ceiling (GLM
+// allows throttled overage) — cap at `100%+` so the segment never reads like a bug
+// (RECTOR pick, v0.4.5). Raw magnitude still lives in the `est` projection; heat uses
+// the RAW percentage, so >100 keeps error-red.
+function usagePercent(w: QuotaLimit): string {
+  return w.percentage > 100 ? "100%+" : `${w.percentage}%`;
+}
+
 function windowPercents(w: QuotaLimit, lengthMs: number, now: number): string {
-  return `${w.percentage}%/${windowElapsedPercent(w.nextResetTime, lengthMs, now)}%`;
+  return `${usagePercent(w)}/${windowElapsedPercent(w.nextResetTime, lengthMs, now)}%`;
 }
 
 function windowCeiling(w: QuotaLimit): string {
