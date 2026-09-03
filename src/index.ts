@@ -10,7 +10,7 @@ import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
 import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
 import { type ProviderRowAdapter } from "./adapters/types.ts";
-import { KNOWN_ROW_IDS, type ColorToken } from "./types.ts";
+import { type ColorToken } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createContextRow } from "./rows/context.ts";
@@ -24,6 +24,7 @@ import { createTicker, type Ticker } from "./ticker.ts";
 import { selfVersion, piVersion } from "./versions.ts";
 import { resolveThemeToken, THEME_PRESETS } from "./theme.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
+import { rowsLegendMessage } from "./tui/legend.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-statusline.json");
@@ -366,7 +367,7 @@ export function activateStatusline(
           break;
         }
         case "list-rows":
-          ctx.ui.notify(`Rows: ${config.display.rows.join(", ")} (valid: ${KNOWN_ROW_IDS.join(", ")})`, "info");
+          ctx.ui.notify(rowsLegendMessage(config.display.rows), "info");
           break;
         case "set-rows":
           config = { ...config, display: { ...config.display, rows: action.ids } };
