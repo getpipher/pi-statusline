@@ -10,7 +10,7 @@ import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
 import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
 import { type ProviderRowAdapter } from "./adapters/types.ts";
-import { KNOWN_ROW_IDS } from "./types.ts";
+import { KNOWN_ROW_IDS, type ColorToken } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createContextRow } from "./rows/context.ts";
