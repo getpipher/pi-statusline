@@ -593,6 +593,7 @@ test("v0.5.1 wiring: /statusline status reports last render + sources", async ()
     h.footerHolder.current.render(500); // populate the lastRender cache
     h.notifications.length = 0;
     const command = h.commands.get("statusline");
+    assert.ok(command, "statusline command registered");
     await command.handler("status", h.ctx);
     const msg = h.notifications[h.notifications.length - 1]!.message;
     assert.match(msg, /pi-statusline 0\.5\.\d — rows: identity, model\+ctx, money, quota, deen, ambient/);
