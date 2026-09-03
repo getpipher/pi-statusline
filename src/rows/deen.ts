@@ -1,4 +1,5 @@
 // src/rows/deen.ts
+import { getGlyph } from "../glyphs.ts";
 import type { DeenSnapshot } from "../deen/source.ts";
 import type { PrayerScheduleEntry } from "../deen/time.ts";
 import type { ColorToken, Fragment, RowDetail } from "../types.ts";
@@ -59,9 +60,10 @@ export function createDeenRow(): Row {
       // rendered prayer starts the line bare; later blocks carry " | ". Hijri/city live on
       // the ambient row now.
       const shown = detail >= 2 ? d.schedule : d.schedule.filter((e) => e.state !== "past");
+      const moon = getGlyph("deen", snapshot.glyphStyle);
       const frags: Fragment[] = [];
       shown.forEach((entry, i) => {
-        frags.push({ text: `${i === 0 ? "" : " | "}${entry.name}`, color: stateColor(entry) });
+        frags.push({ text: `${i === 0 ? (moon ? moon + " " : "") : " | "}${entry.name}`, color: stateColor(entry) });
         frags.push(...prayerTail(entry));
       });
       if (d.staleMinutes !== null) frags.push({ text: ` | stale ${d.staleMinutes}m`, color: "warning" });

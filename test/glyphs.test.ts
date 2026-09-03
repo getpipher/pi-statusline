@@ -28,3 +28,13 @@ test("every style has the same segment keys", () => {
   assert.deepEqual(nerdKeys, uniKeys);
   assert.deepEqual(nerdKeys, asciiKeys);
 });
+
+test("default unicode keeps the zero-change contract — decorative segments empty (v0.4.8)", () => {
+  // The default style must render byte-identically to pre-glyph output: only the
+  // identity-row marks (branch/dirty/ahead/behind) carry unicode glyphs; everything
+  // decorative stays empty so rows skip the prefix entirely.
+  for (const seg of ["model", "clock", "coding", "deen", "burn_rate", "sparkline", "context_gauge", "quota_bar"]) {
+    assert.equal(getGlyph(seg, "unicode"), '', `unicode ${seg} must be empty`);
+  }
+  assert.equal(getGlyph("git_branch", "unicode"), "\u2387");
+});

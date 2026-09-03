@@ -1,5 +1,6 @@
 // src/rows/ambient.ts
 import { formatClock, formatSpan } from "../format.ts";
+import { getGlyph } from "../glyphs.ts";
 import type { Fragment, RowDetail } from "../types.ts";
 import type { Row, RowSnapshot } from "./registry.ts";
 
@@ -8,7 +9,8 @@ export function createAmbientRow(): Row {
     id: "ambient",
     priority: 3,
     render(snapshot: RowSnapshot, detail: RowDetail): Fragment[] | null {
-      const frags: Fragment[] = [{ text: formatClock(snapshot.now), color: "dim" }];
+      const clockGlyph = getGlyph("clock", snapshot.glyphStyle);
+      const frags: Fragment[] = [{ text: `${clockGlyph ? clockGlyph + " " : ""}${formatClock(snapshot.now)}`, color: "dim" }];
       if (detail >= 1) {
         frags.push({ text: ` | coding ${formatSpan(snapshot.session.spanMs)}`, color: "dim" });
         const g = snapshot.git;

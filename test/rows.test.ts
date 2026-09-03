@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import type { Row, RowSnapshot } from "../src/rows/registry.ts";
 import { createIdentityRow } from "../src/rows/identity.ts";
 import { createAmbientRow } from "../src/rows/ambient.ts";
+import { createDeenRow } from "../src/rows/deen.ts";
 import { DEFAULT_CONFIG } from "../src/config.ts";
 import type { SessionSnapshot } from "../src/session/store.ts";
 
@@ -87,6 +88,46 @@ test("identity row: thinking level is a detail>=1 shrink casualty; off renders d
   assert.ok(!zero.includes("high"), "detail 0 drops the level");
   const off = plain(row.render(snap({ session: session({ thinkingLevel: "off" }) }), 2)!);
   assert.ok(off.includes(" · off"), `off renders: ${off}`);
+});
+
+// v0.4.8: nerd-style glyph adoption — model cogs, ambient clock, deen moon.
+// Default unicode stays byte-identical (empty decorative entries).
+const DEEN_DATA = {
+  schedule: [
+    { name: "Fajr", wallMin: 276, minutesUntil: -300, state: "past" },
+    { name: "Dhuhr", wallMin: 720, minutesUntil: 120, state: "next" },
+  ],
+  escalation: "calm", hijri: "21 Rabīʿ al-awwal 1448", city: "Jakarta",
+  timezone: "Asia/Jakarta", staleMinutes: null,
+} as const;
+
+test("identity row nerd: model cogs glyph, unicode default stays bare", () => {
+  const row = createIdentityRow();
+  const nerdFrags = row.render(snap({ session: session({ thinkingLevel: "max" }), glyphStyle: "nerd" }), 2)!;
+  assert.deepEqual(nerdFrags.slice(-2), [
+    { text: " | \uf085 glm-5.2", color: "accent" },
+    { text: " · max", color: "dim" },
+  ]);
+  const uni = plain(row.render(snap({ session: session({}) }), 2)!);
+  assert.ok(!uni.includes("\uf085") && !uni.includes("\u25c6"), `unicode default has no model glyph: ${uni}`);
+});
+
+test("ambient row nerd: clock glyph prefixes the time, unicode default stays bare", () => {
+  const row = createAmbientRow();
+  const d = new Date(Date.UTC(2026, 7, 30, 4, 12));
+  const clock = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const nerdOut = plain(row.render(snap({ session: session({}), glyphStyle: "nerd", deen: null }), 2)!);
+  assert.ok(nerdOut.startsWith("\uf017 " + clock), `nerd clock glyph first: ${nerdOut}`);
+  const uni = plain(row.render(snap({ session: session({}), deen: null }), 2)!);
+  assert.ok(uni.startsWith(clock), `unicode clock bare: ${uni}`);
+});
+
+test("deen row nerd: moon glyph prefixes the strip, unicode default stays bare", () => {
+  const row = createDeenRow();
+  const nerdOut = plain(row.render(snap({ session: session({}), glyphStyle: "nerd", deen: DEEN_DATA as never }), 2)!);
+  assert.ok(nerdOut.startsWith("\uf17d Fajr"), `nerd moon prefix: ${nerdOut}`);
+  const uni = plain(row.render(snap({ session: session({}), deen: DEEN_DATA as never }), 2)!);
+  assert.ok(uni.startsWith("Fajr"), `unicode deen bare: ${uni}`);
 });
 
 test("identity row: strips provider prefix and variant from model id", () => {

@@ -24,14 +24,17 @@ const UNICODE: GlyphTable = {
   git_dirty: "*",
   git_ahead: "\u2191",
   git_behind: "\u2193",
-  model: "\u25c6",
-  context_gauge: "\u25b8",
-  quota_bar: "\u25b8",
-  clock: "\u25f7",
-  coding: "\u2192",
-  deen: "\u263e",
-  burn_rate: "\u25b2",
-  sparkline: "\u25b8",
+  // Zero-change contract (v0.4.8): the DEFAULT style must render byte-identically to
+  // pre-glyph output — decorative segments stay empty so rows skip the prefix. Icons
+  // are an explicit opt-in via nerd (or ascii markers).
+  model: "",
+  context_gauge: "",
+  quota_bar: "",
+  clock: "",
+  coding: "",
+  deen: "",
+  burn_rate: "",
+  sparkline: "",
 };
 
 const ASCII: GlyphTable = {

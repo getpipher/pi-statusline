@@ -37,7 +37,8 @@ export function createIdentityRow(): Row {
           if (marks.length > 0) frags.push({ text: ` ${marks.join(" ")}`, color: "toolTitle" });
         }
       }
-      frags.push({ text: `${frags.length > 0 ? " | " : ""}${formatModelName(s.modelId)}`, color: "accent" });
+      const modelGlyph = getGlyph("model", snapshot.glyphStyle);
+      frags.push({ text: `${frags.length > 0 ? " | " : ""}${modelGlyph ? modelGlyph + " " : ""}${formatModelName(s.modelId)}`, color: "accent" });
       // Thinking level rides the model (v0.4.6): the requested reasoning effort for future
       // turns — `off` included, so a disabled state is visible, not silently absent.
       // detail>=1 shrink casualty (the model itself survives to detail 0).
