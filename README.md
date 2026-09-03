@@ -148,10 +148,12 @@ identically no matter how close the next adhan is.
 ## Commands
 
 - `/statusline refresh` — force a quota poll now
+- `/statusline status` — live report: last rendered footer (L1..Ln) + per-source state (session, zai/or freshness, deen, git, ledger)
+- `/statusline arrange` — interactive WYSIWYG editor: live preview of the real footer, `↑↓` select line · `a` add component · `x` remove line · `[` `]` reorder · `⏎` save · `esc` cancel
 - `/statusline on` / `/statusline off` — enable/disable; `off` restores pi's native footer until `on`
 - `/statusline tier <auto|lite|pro|max>` — tier override
 - `/statusline deen <city|auto>` — set the prayer location; persists to config and force-refreshes
-- `/statusline rows [id,id,...]` — bare `rows` lists the current display order
+- `/statusline rows [id,id,...]` — bare `rows` lists the current display order with a legend; entries may be compounds (`model+ctx`)
   (with the valid ids); `rows identity,money,quota` reorders/subsets the footer,
   validated against the registry and persisted (typos are rejected with the
   valid list)
