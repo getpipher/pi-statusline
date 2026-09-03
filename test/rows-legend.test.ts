@@ -8,15 +8,17 @@ test("first line: current order + valid list (existing contract)", () => {
   const msg = rowsLegendMessage(["ctx", "identity"]);
   const first = msg.split("\n")[0]!;
   assert.match(first, /^Rows: ctx, identity /);
-  assert.match(first, /\(valid: identity, ctx, money, quota, deen, ambient\)/);
+  assert.match(first, /\(valid: identity, model, ctx, money, quota, deen, ambient; join ids with \+ to share a line, e\.g\. model\+ctx\)/);
 });
 
 test("legend lines follow the CURRENT order, one per row, with a → sample", () => {
-  const msg = rowsLegendMessage(["quota", "deen", "ctx", "money", "identity", "ambient"]);
+  const msg = rowsLegendMessage([...KNOWN_ROW_IDS]);
   const lines = msg.split("\n").slice(1).filter((l) => l.trim());
   assert.equal(lines.length, KNOWN_ROW_IDS.length);
-  assert.match(lines[0]!, /^\s*quota\s+→/);
-  assert.match(lines[1]!, /^\s*deen\s+→/);
+  assert.match(lines[0]!, /^\s*identity\s+→/);
+  assert.match(lines[1]!, /^\s*model\s+→/);
+  assert.match(lines[4]!, /^\s*quota\s+→/);
+  assert.match(lines[5]!, /^\s*deen\s+→/);
   for (const id of KNOWN_ROW_IDS) {
     assert.ok(msg.includes(`${id} →`) || new RegExp(`${id}\\s+→`).test(msg), `legend line for ${id}`);
   }

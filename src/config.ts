@@ -1,7 +1,7 @@
 // src/config.ts
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { KNOWN_ROW_IDS, type RowId } from "./types.ts";
+import { KNOWN_ROW_IDS, parseLineSpec } from "./types.ts";
 import type { GlyphStyle } from "./glyphs.ts";
 import type { BarStyle } from "./format.ts";
 
@@ -24,7 +24,8 @@ export interface StatuslineConfig {
     };
   };
   display: {
-    rows: RowId[];          // display order; subset/reorder of the registry, never invents
+    rows: string[];         // display lines: row ids, or compounds joined by "+" (v0.5.0)
+                            // e.g. ["identity", "model+ctx", …] — one line per entry
     bars: boolean;
     showTokens: boolean;
     showContext: boolean;
@@ -48,7 +49,9 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
   deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
   providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   display: {
-    rows: [...KNOWN_ROW_IDS],
+    // Canonical default (v0.5.0): the 6 original lines — `model` is a known id but NOT
+    // in the default (identity still renders the model there; zero-change contract).
+    rows: ["identity", "ctx", "money", "quota", "deen", "ambient"],
     bars: true,
     showTokens: true,
     showContext: true,
@@ -128,13 +131,18 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (d.glyphs === "nerd" || d.glyphs === "unicode" || d.glyphs === "ascii") cfg.display.glyphs = d.glyphs;
     if (d.barStyle === "blocks" || d.barStyle === "rounded" || d.barStyle === "dots" || d.barStyle === "shaded") cfg.display.barStyle = d.barStyle;
     if (Array.isArray(d.rows)) {
-      const valid: RowId[] = [];
-      for (const id of d.rows) {
-        if (typeof id === "string" && (KNOWN_ROW_IDS as readonly string[]).includes(id)) {
-          valid.push(id as RowId);
-        } else if (typeof id === "string" && !unknownRows.includes(id)) {
-          unknownRows.push(id); // D6: unknown ids dropped + reported — surfaces typos
+      const valid: string[] = [];
+      for (const entry of d.rows) {
+        if (typeof entry !== "string" || entry.trim().length === 0) continue;
+        // Compound line specs (v0.5.0): "model+ctx" — every part must be a known id.
+        const parts = parseLineSpec(entry);
+        const unknown = parts.filter((p) => !(KNOWN_ROW_IDS as readonly string[]).includes(p));
+        if (parts.length === 0 || unknown.length > 0) {
+          if (!unknownRows.includes(entry)) unknownRows.push(entry); // D6: dropped + reported
+          continue;
         }
+        const spec = [...new Set(parts)].join("+"); // dedupe parts, first occurrence wins
+        if (!valid.includes(spec)) valid.push(spec);
       }
       if (valid.length > 0) cfg.display.rows = valid;
     }

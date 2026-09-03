@@ -38,12 +38,17 @@ export function createIdentityRow(): Row {
         }
       }
       const modelGlyph = getGlyph("model", snapshot.glyphStyle);
-      frags.push({ text: `${frags.length > 0 ? " | " : ""}${modelGlyph ? modelGlyph + " " : ""}${formatModelName(s.modelId)}`, color: "accent" });
-      // Thinking level rides the model (v0.4.6): the requested reasoning effort for future
-      // turns — `off` included, so a disabled state is visible, not silently absent.
-      // detail>=1 shrink casualty (the model itself survives to detail 0).
-      if (detail >= 1) {
-        frags.push({ text: ` · ${s.thinkingLevel}`, color: "dim" });
+      // Model suppression (v0.5.0): when a "model" line-part exists in the display order
+      // (e.g. "model+ctx"), identity drops its model+thinking fragments — the standalone
+      // model row owns them. Default order has no model part → unchanged output.
+      const modelHasOwnLine = (snapshot.order ?? []).some((entry) =>
+        entry.split("+").map((p) => p.trim()).includes("model"),
+      );
+      if (!modelHasOwnLine) {
+        frags.push({ text: `${frags.length > 0 ? " | " : ""}${modelGlyph ? modelGlyph + " " : ""}${formatModelName(s.modelId)}`, color: "accent" });
+        if (detail >= 1) {
+          frags.push({ text: ` · ${s.thinkingLevel}`, color: "dim" });
+        }
       }
       return frags;
     },

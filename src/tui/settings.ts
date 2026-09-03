@@ -1,5 +1,5 @@
 // src/tui/settings.ts
-import { KNOWN_ROW_IDS, type RowId } from "../types.ts";
+import { KNOWN_ROW_IDS, parseLineSpec } from "../types.ts";
 
 export type StatuslineAction =
   | { action: "open-panel" }
@@ -8,7 +8,7 @@ export type StatuslineAction =
   | { action: "set-tier"; tier: "auto" | "lite" | "pro" | "max" }
   | { action: "set-deen-city"; city: string }
   | { action: "list-rows" }
-  | { action: "set-rows"; ids: RowId[] }
+  | { action: "set-rows"; ids: string[] }
   | { action: "error"; message: string };
 
 const VALID_TIERS = ["auto", "lite", "pro", "max"] as const;
@@ -43,12 +43,19 @@ export function parseStatuslineArgs(args: string | undefined): StatuslineAction 
     case "rows": {
       const rest = args!.trim().slice("rows".length).trim();
       if (!rest) return { action: "list-rows" };
-      const parts2 = rest.split(",").map((s) => s.trim()).filter(Boolean);
-      const invalid = parts2.filter((id) => !(KNOWN_ROW_IDS as readonly string[]).includes(id));
-      if (parts2.length === 0 || invalid.length > 0) {
-        return { action: "error", message: `rows must be a comma-separated subset of: ${KNOWN_ROW_IDS.join(", ")}` };
+      const entries = rest.split(",").map((s) => s.trim()).filter(Boolean);
+      // Compound specs (v0.5.0): "model+ctx" — every part must be a known id.
+      const invalid = entries.filter((e) => {
+        const parts = parseLineSpec(e);
+        return parts.length === 0 || parts.some((p) => !(KNOWN_ROW_IDS as readonly string[]).includes(p));
+      });
+      if (entries.length === 0 || invalid.length > 0) {
+        return {
+          action: "error",
+          message: `rows must be a comma-separated list of: ${KNOWN_ROW_IDS.join(", ")} (join ids with + to share a line, e.g. model+ctx)`,
+        };
       }
-      const ids = [...new Set(parts2)] as RowId[]; // dedupe, first occurrence wins
+      const ids = [...new Set(entries.map((e) => [...new Set(parseLineSpec(e))].join("+")))]; // dedupe, first wins
       return { action: "set-rows", ids };
     }
     default:

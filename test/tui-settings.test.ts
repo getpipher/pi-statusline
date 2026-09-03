@@ -66,6 +66,6 @@ test("rows: bare lists; comma list validates against KNOWN_ROW_IDS; invalid → 
   );
   const bad = parseStatuslineArgs("rows identity,nope");
   assert.equal(bad.action, "error");
-  assert.match(bad.message, /identity, ctx, money, quota, deen, ambient/);
+  assert.match(bad.message, /identity, model, ctx, money, quota, deen, ambient/);
   assert.equal(parseStatuslineArgs("rows ,").action, "error"); // empty after trim
 });

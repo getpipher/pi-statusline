@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: [...KNOWN_ROW_IDS], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default", glyphs: "unicode", barStyle: "blocks" },
+    display: { rows: ["identity", "ctx", "money", "quota", "deen", "ambient"], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default", glyphs: "unicode", barStyle: "blocks" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
@@ -103,7 +103,7 @@ test("v2: defaults include the full canonical row order and gates on", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({}));
   const { config, unknownRows } = loadConfig(path);
-  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  assert.deepEqual(config.display.rows, ["identity", "ctx", "money", "quota", "deen", "ambient"]);
   assert.equal(config.display.bars, true);
   assert.deepEqual(unknownRows, []);
 });
@@ -127,7 +127,7 @@ test("v2: non-string or non-array rows fall back to defaults", () => {
   const path = join(tmpDir, "pi-statusline.json");
   writeFileSync(path, JSON.stringify({ display: { rows: "identity", bars: "yes" } }));
   const { config } = loadConfig(path);
-  assert.deepEqual(config.display.rows, [...KNOWN_ROW_IDS]);
+  assert.deepEqual(config.display.rows, ["identity", "ctx", "money", "quota", "deen", "ambient"]);
   assert.equal(config.display.bars, true);
 });
 
@@ -142,7 +142,7 @@ test("v1 back-compat: a v1 file (no rows/bars) loads cleanly with defaults merge
   assert.equal(cfg.zai.tier, "pro");
   assert.equal(cfg.zai.pollIntervalMs, 60_000);
   assert.equal(cfg.display.showTokens, false);
-  assert.deepEqual(cfg.display.rows, [...KNOWN_ROW_IDS]);
+  assert.deepEqual(cfg.display.rows, ["identity", "ctx", "money", "quota", "deen", "ambient"]);
   assert.deepEqual(unknownRows, []);
 });
 

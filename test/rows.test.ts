@@ -5,6 +5,8 @@ import type { Row, RowSnapshot } from "../src/rows/registry.ts";
 import { createIdentityRow } from "../src/rows/identity.ts";
 import { createAmbientRow } from "../src/rows/ambient.ts";
 import { createDeenRow } from "../src/rows/deen.ts";
+import { createModelRow } from "../src/rows/model.ts";
+import { createRowRegistry, renderRows } from "../src/rows/registry.ts";
 import { DEFAULT_CONFIG } from "../src/config.ts";
 import type { SessionSnapshot } from "../src/session/store.ts";
 
@@ -45,6 +47,39 @@ function session(partial: Partial<SessionSnapshot>): SessionSnapshot {
 function plain(frags: ReturnType<Row["render"]>): string {
   return (frags ?? []).map((f) => f.text).join("");
 }
+
+test("compound line: model+ctx renders ONE line, model first, dim separator between parts", () => {
+  // v0.5.0 — display.rows entries may join row ids with "+": the compound renders each
+  // part on the same line, joined with the dim " | " separator.
+  const order = ["identity", "model+ctx", "money"];
+  const registry = createRowRegistry([createIdentityRow(), createModelRow(), createContextRow(), createMoneyRow()]);
+  const snap0 = snap({
+    session: session({ branch: null, sessionName: undefined, contextPercent: 25, contextTokens: 50_000, contextWindow: 200_000 }),
+    order,
+    ledger: { todayCost: 1, last7Cost: 2, last30Cost: 3, repoCost: 0 },
+  });
+  const lines = renderRows(registry, order, snap0);
+  assert.equal(lines.length, 3, "3 lines: identity (model suppressed), model+ctx, money");
+  assert.match(lines[1]!.map((f) => f.text).join(""), /^glm-5\.2 · off \| Ctx: 25%/);
+  // identity suppressed its model (model has its own line-part)
+  assert.ok(!lines[0]!.map((f) => f.text).join("").includes("glm-5.2"));
+});
+
+test("compound line: unknown part is skipped, known parts still render", () => {
+  const order = ["nope+ctx"];
+  const registry = createRowRegistry([createContextRow()]);
+  const lines = renderRows(registry, order, snap({ session: session({ contextPercent: 10 }) }));
+  assert.equal(lines.length, 1);
+  assert.match(lines[0]!.map((f) => f.text).join(""), /^Ctx: 10%/);
+});
+
+test("default order unchanged: identity still carries the model (no suppression)", () => {
+  const order = ["identity", "ctx"];
+  const registry = createRowRegistry([createIdentityRow(), createModelRow(), createContextRow()]);
+  const lines = renderRows(registry, order, snap({ session: session({ branch: null, sessionName: undefined, contextPercent: 10 }) }));
+  assert.equal(lines.length, 2);
+  assert.match(lines[0]!.map((f) => f.text).join(""), /\| glm-5\.2/);
+});
 
 test("identity row: session name bright lead, repo dim, branch mid with ⎇, model accent", () => {
   const row = createIdentityRow();

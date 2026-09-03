@@ -10,9 +10,10 @@ import { createLedgerStore, type LedgerStore } from "./ledger/store.ts";
 import { createZaiAdapter } from "./adapters/zai.ts";
 import { createOpenRouterAdapter, readOrKey } from "./adapters/openrouter.ts";
 import { type ProviderRowAdapter } from "./adapters/types.ts";
-import { type ColorToken } from "./types.ts";
+import { KNOWN_ROW_IDS, type ColorToken } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
+import { createModelRow } from "./rows/model.ts";
 import { createContextRow } from "./rows/context.ts";
 import { createMoneyRow } from "./rows/money.ts";
 import { createQuotaRow } from "./rows/quota.ts";
@@ -131,6 +132,7 @@ export function activateStatusline(
     });
     registry = createRowRegistry([
       createIdentityRow(),
+      createModelRow(),
       createContextRow(),
       createMoneyRow(),
       createQuotaRow(adapters),
@@ -192,7 +194,7 @@ export function activateStatusline(
     for (const id of pendingRowWarnings) {
       if (notifiedRowWarnings.has(id)) continue;
       notifiedRowWarnings.add(id);
-      sessionCtx.ui.notify(`pi-statusline: unknown display.rows id "${id}" — dropped (valid: identity, ctx, money, quota, deen, ambient)`, "warning");
+      sessionCtx.ui.notify(`pi-statusline: unknown display.rows id "${id}" — dropped (valid: ${KNOWN_ROW_IDS.join(", ")}; join ids with + to share a line, e.g. model+ctx)`, "warning");
     }
     pendingRowWarnings.clear();
   }
@@ -239,6 +241,7 @@ export function activateStatusline(
             deen: deenSource.current(),
             git: gitSource.get(),
             versions: dependencies.readVersions(),
+            order: config.display.rows, // identity reads this to suppress its model when a model line-part exists
             glyphStyle: config.display.glyphs,
             barStyle: config.display.barStyle,
           };

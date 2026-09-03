@@ -64,9 +64,14 @@ In `~/.pi/agent/settings.json`:
 ```
 
 - **`display.rows`** — which rows render and in what order; a subset/reorder
-  of the registry (`identity`, `ctx`, `money`, `quota`, `deen`, `ambient`),
+  of the registry (`identity`, `model`, `ctx`, `money`, `quota`, `deen`, `ambient`),
   never an invention. Unknown ids are dropped with a one-time warning (surfaced
   as a notify, once per id per session — handy for typo-spotting).
+  **Compound lines (v0.5.0):** join ids with `+` to render multiple rows on ONE
+  line — `"rows": ["identity", "model+ctx", "money", …]` puts the model first on
+  the ctx line. `model` is a known id but NOT in the default rows: by default the
+  model still renders inside `identity` (and `identity` suppresses its model
+  automatically when a `model` line-part exists — no duplication).
 - **`display.bars`** — inert since v0.4.1 (the ctx and quota bars were removed per RECTOR; the key is still accepted for back-compat).
 - **`display.sparkline` / `display.burnAnchor`** — removed in v0.4.6 (sparkline + burn rate decluttered away per RECTOR); the keys are ignored.
 - **`display.showVersions`** — appends `SL:<version> · PI:<version>` stamps to the

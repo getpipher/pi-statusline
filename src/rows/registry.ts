@@ -22,11 +22,11 @@ export interface RowSnapshot {
   versions: { sl: string; pi: string | null }; // SL = our package, PI = linked host package (null = unresolved)
   glyphStyle: GlyphStyle; // segment decoration style (visual upgrade)
   barStyle: BarStyle; // progress bar character style
-  order?: RowId[]; // optional echo of the display order (unused by rows; kept for debugging)
+  order?: string[]; // echo of the display LINES (compound specs verbatim) — identity reads it to suppress its model when a "model" line-part exists
 }
 
 export interface Row {
-  id: RowId;
+  id: string; // atom RowId for registered rows; compound "a+b" for virtual composite lines
   priority: RowPriority;
   // null → row omitted (source unavailable/failed). Fragments own all spacing/separators;
   // the renderer joins them with "" and applies theme colors. `detail` is the responsive
@@ -68,13 +68,40 @@ function dropOrder(rendered: RenderedRow[]): RenderedRow[] {
   );
 }
 
-export function renderRows(registry: RowRegistry, order: RowId[], snapshot: RowSnapshot): Fragment[][] {
-  const resolved = order
-    .map((id) => registry.get(id))
-    .filter((row): row is Row => row !== undefined); // known-but-unregistered ids (deen in P1) skip silently
+export function renderRows(registry: RowRegistry, order: string[], snapshot: RowSnapshot): Fragment[][] {
+  // Compound line specs (v0.5.0): "model+ctx" renders BOTH rows on one line, joined with
+  // the dim " | " separator. The compound is a virtual Row: priority = most-protected
+  // part (min), render = parts at the requested detail (null parts skipped).
+  const lines = order
+    .map((entry) => entry.split("+").map((p) => p.trim()).filter((p) => p.length > 0))
+    .map((parts) => {
+      const rows = parts
+        .map((id) => registry.get(id as RowId))
+        .filter((row): row is Row => row !== undefined);
+      if (rows.length === 0) return undefined;
+      return {
+        id: parts.join("+"),
+        priority: Math.min(...rows.map((r) => r.priority)) as RowPriority,
+        render(s: RowSnapshot, detail: RowDetail): Fragment[] | null {
+          const frags: Fragment[] = [];
+          for (const row of rows) {
+            let f = row.render(s, detail);
+            if (!f || f.length === 0) continue;
+            if (frags.length > 0) {
+              // Normalize: the joined separator is ours; a part's own leading " | " is stripped.
+              if (f[0]!.text.startsWith(" | ")) f = [{ ...f[0]!, text: f[0]!.text.slice(3) }, ...f.slice(1)];
+              frags.push({ text: " | ", color: "dim" });
+            }
+            frags.push(...f);
+          }
+          return frags.length > 0 ? frags : null;
+        },
+      } satisfies Row;
+    })
+    .filter((row): row is Row => row !== undefined);
 
   const rendered: RenderedRow[] = [];
-  resolved.forEach((row, displayIndex) => {
+  lines.forEach((row, displayIndex) => {
     const fragments = row.render(snapshot, 2);
     if (fragments && fragments.length > 0) {
       rendered.push({ row, displayIndex, fragments, width: lineWidth(fragments), detail: 2 });
