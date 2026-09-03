@@ -62,6 +62,8 @@ function makeHarness() {
   ]);
   let renderRequests = 0;
   let setFooterCalls = 0;
+  let lastPanelComponent: { handleInput(data: string): void } | null = null;
+  const customAutoKeys: string[] = ["\r"];
   const footerHolder: { current: FooterComponent | null } = { current: null };
 
   const tui = { requestRender: () => { renderRequests++; } };
@@ -116,6 +118,16 @@ function makeHarness() {
         footerHolder.current = factory ? factory(tui, theme, footerData) : null;
       },
       notify: (message: string, level: string) => notifications.push({ message, level }),
+      // ctx.ui.custom fake: builds the component, optionally auto-drives keystrokes
+      // (customAutoKeys), resolves with the done() value. Tests read lastPanelComponent.
+      custom: async (factory: (tui: unknown, theme: unknown, kb: unknown, done: (v: unknown) => void) => unknown) => {
+        let resolved: unknown;
+        const done = (v: unknown) => { resolved = v; };
+        const component = factory(tui, theme, {}, done) as { handleInput(data: string): void };
+        lastPanelComponent = component;
+        for (const key of customAutoKeys) component.handleInput(key);
+        return resolved;
+      },
     },
   };
   const ctx = ctxObject as unknown as ExtensionContext;
@@ -150,6 +162,7 @@ function makeHarness() {
   return {
     tmp, configPath, handlers, commands, colors, notifications, renderRequests: () => renderRequests,
     setFooterCalls: () => setFooterCalls, footerHolder, ctxObject, ctx, pi,
+    lastPanelComponent: () => lastPanelComponent, customAutoKeys,
     fakeZaiAdapter, fakeGitSource,
     git: {
       set: (d: import("../src/git/source.ts").GitSnapshot | null) => { gitData = d; },
@@ -620,6 +633,36 @@ test("v0.5.1 wiring: /statusline status reports last render + sources", async ()
     assert.match(msg, /zai\s+→ ok/);
     assert.match(msg, /session\s+→ zai\/glm-5\.2 · thinking \w+ · ctx \d+%/);
     assert.match(msg, /deen\s+→ Jakarta · next Dhuhr/);
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
+test("v0.6.0 wiring: /statusline arrange opens the WYSIWYG panel and persists on save", async () => {
+  const h = makeHarness();
+  try {
+    // Start from a 2-line arrangement; drive the panel: a → palette, ↓ → ctx, ⏎ add, ⏎ save.
+    writeFileSync(h.configPath, JSON.stringify({ display: { rows: ["identity", "ctx"] } }));
+    h.customAutoKeys.length = 0;
+    h.customAutoKeys.push("a", "\x1b[B", "\r", "\r");
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(h.lastPanelComponent() === null || h.lastPanelComponent(), "custom accessor ready");
+    const command = h.commands.get("statusline");
+    assert.ok(command);
+    await command.handler("arrange", h.ctx);
+    const persisted = JSON.parse(readFileSync(h.configPath, "utf8")) as { display: { rows: string[] } };
+    // Components may repeat across lines by design — the standalone ctx line survives.
+    assert.deepEqual(persisted.display.rows, ["identity+ctx", "ctx"], "compound saved via the editor");
+    assert.ok(h.notifications.some((n) => n.message.includes("Arrangement saved: identity+ctx")), "saved notify");
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });

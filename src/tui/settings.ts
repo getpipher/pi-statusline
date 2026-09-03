@@ -5,6 +5,7 @@ export type StatuslineAction =
   | { action: "open-panel" }
   | { action: "refresh" }
   | { action: "status" }
+  | { action: "arrange" }
   | { action: "set-enabled"; enabled: boolean }
   | { action: "set-tier"; tier: "auto" | "lite" | "pro" | "max" }
   | { action: "set-deen-city"; city: string }
@@ -25,6 +26,8 @@ export function parseStatuslineArgs(args: string | undefined): StatuslineAction 
       return { action: "refresh" };
     case "status":
       return { action: "status" };
+    case "arrange":
+      return { action: "arrange" };
     case "on":
       return { action: "set-enabled", enabled: true };
     case "off":

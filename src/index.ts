@@ -14,6 +14,7 @@ import { KNOWN_ROW_IDS, type ColorToken } from "./types.ts";
 import { createRowRegistry, renderRows, type Row, type RowSnapshot } from "./rows/registry.ts";
 import { createIdentityRow } from "./rows/identity.ts";
 import { createModelRow } from "./rows/model.ts";
+import { createArrangePanel } from "./tui/arrangePanel.ts";
 import { createContextRow } from "./rows/context.ts";
 import { createMoneyRow } from "./rows/money.ts";
 import { createQuotaRow } from "./rows/quota.ts";
@@ -324,7 +325,7 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (refresh | status | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
+    description: "Configure the statusline (arrange | refresh | status | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
@@ -376,6 +377,44 @@ export function activateStatusline(
         case "list-rows":
           ctx.ui.notify(rowsLegendMessage(config.display.rows), "info");
           break;
+        case "arrange": {
+          // WYSIWYG editor (v0.6.0): the panel renders the DRAFT through the real
+          // registry + live snapshot; save persists via the existing saveConfig path.
+          const arrangeSnapshot: RowSnapshot = {
+            now: Date.now(),
+            width: 120,
+            session: sessionStore.getSnapshot(),
+            ledger: ensureLedger().getSnapshot(),
+            statuses: "",
+            config,
+            deen: deenSource.current(),
+            git: gitSource.get(),
+            versions: dependencies.readVersions(),
+            order: config.display.rows,
+            glyphStyle: config.display.glyphs,
+            barStyle: config.display.barStyle,
+          };
+          const applied = await ctx.ui.custom<string[] | null>((tui, theme, _kb, done) => {
+            const panel = createArrangePanel({
+              registry,
+              snapshot: arrangeSnapshot,
+              initial: config.display.rows,
+              theme,
+              onChange: () => tui.requestRender(),
+              onDone: (value) => done(value),
+            });
+            return panel.component;
+          });
+          if (applied) {
+            config = { ...config, display: { ...config.display, rows: applied } };
+            saveConfig(dependencies.configPath, config);
+            ctx.ui.notify(`Arrangement saved: ${applied.join(", ")}`, "info");
+          } else {
+            ctx.ui.notify("Arrangement cancelled", "info");
+          }
+          requestRenderFn?.();
+          break;
+        }
         case "status": {
           const snap = sessionStore.getSnapshot();
           const now = Date.now();
