@@ -18,7 +18,7 @@ export function selectLine(d: ArrangeDraft, index: number): ArrangeDraft {
   return { lines: [...d.lines], selected: Math.max(0, clamped) };
 }
 
-export function moveLine(d: ArrangeDraft, delta: 1 | -1): ArrangeDraft {
+export function moveLine(d: ArrangeDraft, delta: number): ArrangeDraft {
   const target = d.selected + delta;
   if (target < 0 || target >= d.lines.length) return selectLine(d, d.selected);
   const lines = [...d.lines];
