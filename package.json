@@ -1,6 +1,6 @@
 {
   "name": "@getpipher/pi-statusline",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "description": "Adaptive, provider-aware footer for the Pi Coding Agent. Shows authoritative z.ai quota balance.",
   "keywords": [
     "pi-package",
