@@ -2,6 +2,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { KNOWN_ROW_IDS, type RowId } from "./types.ts";
+import type { GlyphStyle } from "./glyphs.ts";
+import type { BarStyle } from "./format.ts";
 
 export interface StatuslineConfig {
   enabled: boolean;
@@ -30,8 +32,8 @@ export interface StatuslineConfig {
     showSession: boolean;
     showVersions: boolean; // ambient SL/PI stamps (spec §15), default off
     theme: string; // named preset — validated at use, unknown-row precedent
-    glyphs: "nerd" | "unicode" | "ascii"; // segment decoration style (visual upgrade)
-    barStyle: "blocks" | "rounded" | "dots" | "shaded"; // progress bar character style
+    glyphs: GlyphStyle; // segment decoration style (visual upgrade)
+    barStyle: BarStyle; // progress bar character style
   };
 }
 

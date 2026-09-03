@@ -55,9 +55,3 @@ export function resolveThemeToken(token: ColorToken, themeName: string): string 
   if (!preset) return token;
   return preset.tokens[token] ?? token;
 }
-
-export function applyThemeColor(token: ColorToken, presetName: string): { color: string; known: boolean } {
-  const preset = THEME_PRESETS[presetName];
-  if (!preset) return { color: token, known: false };
-  return { color: preset.tokens[token] ?? token, known: true };
-}
