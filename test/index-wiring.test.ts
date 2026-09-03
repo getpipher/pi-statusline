@@ -578,6 +578,23 @@ test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", 
 
 test("v0.5.1 wiring: /statusline status reports last render + sources", async () => {
   const h = makeHarness();
+  // Deterministic deen source (CI has no deen cache + no network): the status deen line
+  // must not depend on the runner environment.
+  const fakeDeenStatus: DeenSource = {
+    current: () => ({
+      schedule: [
+        { name: "Fajr", wallMin: 276, minutesUntil: -300, state: "past" },
+        { name: "Dhuhr", wallMin: 720, minutesUntil: 120, state: "next" },
+        { name: "Asr", wallMin: 920, minutesUntil: 320, state: "upcoming" },
+        { name: "Maghrib", wallMin: 1080, minutesUntil: 500, state: "upcoming" },
+        { name: "Isha", wallMin: 1170, minutesUntil: 660, state: "upcoming" },
+      ],
+      escalation: "calm", hijri: "21 Rab\u012b\u02bf al-awwal 1448", city: "Jakarta",
+      timezone: "Asia/Jakarta", staleMinutes: null,
+    }),
+    refresh: async () => {},
+    geo: () => null,
+  };
   try {
     writeFileSync(h.configPath, JSON.stringify({ display: { rows: ["identity", "model+ctx", "money", "quota", "deen", "ambient"] }, providers: { openrouter: { enabled: false } } }));
     activateStatusline(h.pi, {
@@ -587,6 +604,7 @@ test("v0.5.1 wiring: /statusline status reports last render + sources", async ()
       readKey: () => "fixture-key",
       makeGitSource: () => h.fakeGitSource,
       makeAdapters: () => [h.fakeZaiAdapter],
+      makeDeenSource: () => fakeDeenStatus,
     });
     h.handlers.get("session_start")?.({}, h.ctx);
     assert.ok(h.footerHolder.current, "footer installed");
