@@ -60,6 +60,15 @@ export function renderZaiQuota(data: QuotaResult, now: number): string {
   return zaiSegments(data, now).map((s) => s.text).join("");
 }
 
+// /statusline status: source freshness + the two window percentages (raw — no cap).
+export function zaiStatusDetail(data: QuotaResult, now: number): string {
+  const parts: string[] = [];
+  if (data.fiveHour) parts.push(`5h ${data.fiveHour.percentage}%`);
+  if (data.weekly) parts.push(`weekly ${data.weekly.percentage}%`);
+  parts.push(`fetched ${Math.max(0, Math.floor((now - data.fetchedAt) / 60_000))}m ago`);
+  return parts.join(" · ");
+}
+
 export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<QuotaResult> {
   let poller: QuotaPoller<QuotaResult> | null = null;
 
@@ -89,6 +98,7 @@ export function createZaiAdapter(deps: ZaiAdapterDeps): ProviderRowAdapter<Quota
     segments: (data, now) => zaiSegments(data, now),
     // Heat = 5h window usage (weekly fallback) — mirrors the ctx row's escalation bands.
     heat: (data) => data.fiveHour?.percentage ?? data.weekly?.percentage ?? null,
+    statusDetail: (data, now) => zaiStatusDetail(data, now),
     start() {
       if (!ensurePoller()) return;
       poller!.start();

@@ -102,6 +102,11 @@ export function createOpenRouterAdapter(deps: OpenRouterAdapterDeps): ProviderRo
       return line;
     },
     heat: (data) => (data.totalCredits > 0 ? (data.totalUsage / data.totalCredits) * 100 : null),
+    statusDetail: (data, now) => {
+      const left = data.totalCredits - data.totalUsage;
+      const age = Math.max(0, Math.floor((now - data.fetchedAt) / 60_000));
+      return `left $${formatMoney(left)} · used $${formatMoney(data.totalUsage)} · fetched ${age}m ago`;
+    },
     start() {
       if (!ensurePoller()) return;
       poller!.start();

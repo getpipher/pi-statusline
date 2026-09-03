@@ -576,6 +576,37 @@ test("v2 P3 wiring: mono theme remaps hue tokens; unknown theme notifies once", 
 
 // ── v2 P3 wiring: /statusline rows — persist order + notify + re-render ──
 
+test("v0.5.1 wiring: /statusline status reports last render + sources", async () => {
+  const h = makeHarness();
+  try {
+    writeFileSync(h.configPath, JSON.stringify({ display: { rows: ["identity", "model+ctx", "money", "quota", "deen", "ambient"] }, providers: { openrouter: { enabled: false } } }));
+    activateStatusline(h.pi, {
+      authJsonPath: join(h.tmp, "auth.json"),
+      configPath: h.configPath,
+      ledgerPath: join(h.tmp, "ledger.jsonl"),
+      readKey: () => "fixture-key",
+      makeGitSource: () => h.fakeGitSource,
+      makeAdapters: () => [h.fakeZaiAdapter],
+    });
+    h.handlers.get("session_start")?.({}, h.ctx);
+    assert.ok(h.footerHolder.current, "footer installed");
+    h.footerHolder.current.render(500); // populate the lastRender cache
+    h.notifications.length = 0;
+    const command = h.commands.get("statusline");
+    await command.handler("status", h.ctx);
+    const msg = h.notifications[h.notifications.length - 1]!.message;
+    assert.match(msg, /pi-statusline 0\.5\.\d — rows: identity, model\+ctx, money, quota, deen, ambient/);
+    assert.match(msg, /rendered \d+s ago/);
+    assert.match(msg, /L2: .*glm-5\.2/, "compound model+ctx renders on its line");
+    assert.match(msg, /zai\s+→ ok/);
+    assert.match(msg, /session\s+→ zai\/glm-5\.2 · thinking \w+ · ctx \d+%/);
+    assert.match(msg, /deen\s+→ Jakarta · next Dhuhr/);
+  } finally {
+    h.footerHolder.current?.dispose();
+    rmSync(h.tmp, { recursive: true, force: true });
+  }
+});
+
 test("v2 P3 wiring: rows command persists display order and notifies", async () => {
   const h = makeHarness();
   try {

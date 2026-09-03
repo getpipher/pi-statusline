@@ -4,6 +4,7 @@ import { KNOWN_ROW_IDS, parseLineSpec } from "../types.ts";
 export type StatuslineAction =
   | { action: "open-panel" }
   | { action: "refresh" }
+  | { action: "status" }
   | { action: "set-enabled"; enabled: boolean }
   | { action: "set-tier"; tier: "auto" | "lite" | "pro" | "max" }
   | { action: "set-deen-city"; city: string }
@@ -22,6 +23,8 @@ export function parseStatuslineArgs(args: string | undefined): StatuslineAction 
   switch (cmd) {
     case "refresh":
       return { action: "refresh" };
+    case "status":
+      return { action: "status" };
     case "on":
       return { action: "set-enabled", enabled: true };
     case "off":

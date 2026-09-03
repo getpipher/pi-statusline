@@ -26,6 +26,7 @@ import { selfVersion, piVersion } from "./versions.ts";
 import { resolveThemeToken, THEME_PRESETS } from "./theme.ts";
 import { parseStatuslineArgs } from "./tui/settings.ts";
 import { rowsLegendMessage } from "./tui/legend.ts";
+import { formatStatusMessage, type StatusAdapter } from "./tui/status.ts";
 
 const AUTH_JSON = join(homedir(), ".pi", "agent", "auth.json");
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "pi-statusline.json");
@@ -90,6 +91,8 @@ export function activateStatusline(
   let ticker: Ticker | null = null;
   let requestRenderFn: (() => void) | null = null;
   let footerInstalled = false;
+  // /statusline status: the LAST rendered footer (ground truth of what the user sees).
+  let lastRender: { at: number; lines: string[] } | null = null;
   // Parallel to pendingRowWarnings/notifiedRowWarnings: theme validity is checked at
   // use (per render) but the unknown-theme notify fires at most once per activation.
   let notifiedThemeWarning = false;
@@ -246,6 +249,7 @@ export function activateStatusline(
             barStyle: config.display.barStyle,
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
+          lastRender = { at: Date.now(), lines: lines.map((frags) => frags.map((f) => f.text).join("")) };
           // Theme validation at use (mirrors unknown-row handling): one-time notify.
           const themeName = config.display.theme;
           if (!(themeName in THEME_PRESETS) && !notifiedThemeWarning) {
@@ -320,7 +324,7 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
+    description: "Configure the statusline (refresh | status | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
@@ -372,6 +376,45 @@ export function activateStatusline(
         case "list-rows":
           ctx.ui.notify(rowsLegendMessage(config.display.rows), "info");
           break;
+        case "status": {
+          const snap = sessionStore.getSnapshot();
+          const now = Date.now();
+          const adapterStates: StatusAdapter[] = adapters.map((a) => {
+            const data = a.current();
+            if (data === null || data === undefined) {
+              const inert = a.id === "or" ? " — no openrouter.key" : "";
+              return { id: a.id, state: "no-data", detail: `row omitted${inert}` };
+            }
+            return { id: a.id, state: "ok", detail: a.statusDetail?.(data, now) ?? "ok" };
+          });
+          const deen = deenSource.current();
+          const deenDetail = deen
+            ? (() => {
+                const next = deen.schedule.find((e) => e.state === "next");
+                const nextTxt = next
+                  ? `${next.name} ${String(Math.floor(next.wallMin / 60)).padStart(2, "0")}:${String(next.wallMin % 60).padStart(2, "0")} (${Math.max(0, Math.floor(next.minutesUntil / 60))}h ${next.minutesUntil % 60}m)`
+                  : "no next";
+                return `${deen.city} · next ${nextTxt} · ${deen.staleMinutes === null ? "fresh" : `stale ${deen.staleMinutes}m`}`;
+              })()
+            : null;
+          const g = gitSource.get();
+          const gitDetail = g
+            ? `${snap.branch ?? "no branch"}${g.dirty ? "*" : ""} · ${g.dirty ? "dirty" : "clean"}${g.commitsToday !== null ? ` · ${g.commitsToday} commits today` : ""}`
+            : null;
+          const led = ensureLedger().getSnapshot();
+          ctx.ui.notify(formatStatusMessage({
+            version: dependencies.readVersions().sl,
+            rows: config.display.rows,
+            lastRender,
+            now,
+            session: { provider: snap.provider, model: snap.modelId, thinking: snap.thinkingLevel, contextPercent: snap.contextPercent },
+            adapters: adapterStates,
+            deen: deenDetail ? { detail: deenDetail } : null,
+            git: gitDetail ? { detail: gitDetail } : null,
+            ledger: { detail: `REPO $${led.repoCost.toFixed(2)} · DAY $${led.todayCost.toFixed(2)} · 7DAY $${led.last7Cost.toFixed(2)}` },
+          }), "info");
+          break;
+        }
         case "set-rows":
           config = { ...config, display: { ...config.display, rows: action.ids } };
           saveConfig(dependencies.configPath, config);

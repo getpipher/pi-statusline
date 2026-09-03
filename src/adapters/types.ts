@@ -18,6 +18,8 @@ export interface ProviderRowAdapter<D = unknown> {
   // Usage heat 0..100 for the row tint (accent <70%, warning ≥70%, error ≥90%);
   // absent or null → neutral muted. Optional so trivial adapters can skip it.
   heat?(data: D): number | null;
+  // One-line source state for /statusline status (v0.5.1): freshness + key numbers.
+  statusDetail?(data: D, now: number): string;
   start(): void;                  // begin background polling (no-op when unconfigured)
   stop(): void;
 }
