@@ -627,7 +627,7 @@ test("v0.5.1 wiring: /statusline status reports last render + sources", async ()
     assert.ok(command, "statusline command registered");
     await command.handler("status", h.ctx);
     const msg = h.notifications[h.notifications.length - 1]!.message;
-    assert.match(msg, /pi-statusline 0\.5\.\d — rows: identity, model\+ctx, money, quota, deen, ambient/);
+    assert.match(msg, /pi-statusline \d+\.\d+\.\d+ — rows: identity, model\+ctx, money, quota, deen, ambient/);
     assert.match(msg, /rendered \d+s ago/);
     assert.match(msg, /L2: .*glm-5\.2/, "compound model+ctx renders on its line");
     assert.match(msg, /zai\s+→ ok/);
