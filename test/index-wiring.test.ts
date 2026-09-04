@@ -493,7 +493,7 @@ test("v2 P3 wiring: makeAdapters deps include a resolving ledger getter", async 
     });
     h.handlers.get("session_start")?.({}, h.ctx);
     assert.ok(seen, "ledger getter resolves to the live store (ensureLedger ran before makeAdapters)");
-    assert.equal(typeof seen!.providerTodayCost, "function", "store is the full LedgerStore (Task 1 queries present)");
+    assert.equal(typeof seen!.providerTodayStats, "function", "store is the full LedgerStore (Task 1 queries present)");
   } finally {
     h.footerHolder.current?.dispose();
     rmSync(h.tmp, { recursive: true, force: true });
@@ -769,7 +769,7 @@ test("final-fix: session attribution flows ctx → store → adapter (OR today f
   try {
     type LedgerGetter = () => import("../src/ledger/store.ts").LedgerStore | null;
     let injectedLedger: LedgerGetter | undefined;
-    // providerTodayCost scopes to TODAY's local-day bucket — timestamp the fixture
+    // providerTodayStats scopes to TODAY's local-day bucket — timestamp the fixture
     // entries into the current day (the same mutation the Task-5/11 wiring tests use).
     // Midnight-safe anchor (P3-36): a raw `now - 2h` falls into YESTERDAY when the suite
     // runs between local 00:00 and 02:00 — anchor to local midnight + 90min instead, so
@@ -789,7 +789,7 @@ test("final-fix: session attribution flows ctx → store → adapter (OR today f
       // Renders through the INJECTED ledger dep — the real store-to-row path.
       render: (_d, _dim) => {
         const l = injectedLedger?.() ?? null;
-        const today = l ? l.providerTodayCost("zai") : -1;
+        const today = l ? l.providerTodayStats("zai").cost : -1;
         return `or-ledger $${today.toFixed(2)} today`;
       },
       start: () => {},

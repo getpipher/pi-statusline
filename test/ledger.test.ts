@@ -219,22 +219,26 @@ test("costSince(ts) sums costs on/after the timestamp (burn-anchor query)", () =
   rmSync(dir, { recursive: true, force: true });
 });
 
-test("providerTodayCost / providerTodayTopModel scope by provider + today (store clock)", () => {
+test("providerTodayStats: ONE pass returns {cost, top} scoped by provider + today (store clock)", () => {
   const dir = mkdtempSync(join(tmpdir(), "ledger-prov-"));
   const filePath = join(dir, "ledger.jsonl");
+  let model = "claude-opus-4.6"; // attribute() is a live session getter — models change BETWEEN reconciles
   const store = createLedgerStore({
     filePath, now: () => Date.UTC(2026, 7, 30, 10, 0), utcOffsetMinutes: SGT,
-    attribute: () => ({ provider: "openrouter", model: "claude-opus-4.6" }),
+    attribute: () => ({ provider: "openrouter", model }),
   });
   store.load();
   store.reconcile([
-    entry("p1", "2026-08-30T02:00:00.000Z", 0.9),  // today SGT (10:00), openrouter
+    entry("p1", "2026-08-30T02:00:00.000Z", 0.9),  // today SGT (10:00)
     entry("p2", "2026-08-30T03:00:00.000Z", 0.4),  // today, same model
-    entry("p3", "2026-08-29T03:00:00.000Z", 5.0),  // yesterday — excluded
+    entry("p3", "2026-08-30T04:00:00.000Z", 0.6),  // today, other model — top switches
+    entry("p4", "2026-08-29T03:00:00.000Z", 5.0),  // yesterday — excluded
   ]);
-  assert.equal(store.providerTodayCost("openrouter"), 1.3);
-  assert.equal(store.providerTodayCost("zai"), 0);
-  assert.deepEqual(store.providerTodayTopModel("openrouter"), { model: "claude-opus-4.6", cost: 1.3 });
-  assert.equal(store.providerTodayTopModel("zai"), null);
+  assert.deepEqual(store.providerTodayStats("openrouter"), { cost: 1.9, top: { model: "claude-opus-4.6", cost: 1.9 } });
+  assert.deepEqual(store.providerTodayStats("zai"), { cost: 0, top: null });
+  // top re-ranks when the session switches models and another model overtakes
+  model = "glm-5.3";
+  store.reconcile([entry("p5", "2026-08-30T05:00:00.000Z", 2.0)]);
+  assert.deepEqual(store.providerTodayStats("openrouter"), { cost: 3.9, top: { model: "glm-5.3", cost: 2.0 } });
   rmSync(dir, { recursive: true, force: true });
 });

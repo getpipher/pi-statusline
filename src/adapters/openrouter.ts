@@ -92,10 +92,9 @@ export function createOpenRouterAdapter(deps: OpenRouterAdapterDeps): ProviderRo
       let line = `or $${formatMoney(left)} left`;
       const ledger = deps.ledger();
       if (ledger) {
-        const today = ledger.providerTodayCost("openrouter");
+        const { cost: today, top } = ledger.providerTodayStats("openrouter");
         if (today > 0) {
           line += ` · $${formatMoney(today)} today`;
-          const top = ledger.providerTodayTopModel("openrouter");
           if (top) line += ` · top: ${top.model} $${formatMoney(top.cost)}`;
         }
       }

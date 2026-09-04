@@ -40,8 +40,8 @@ export interface LedgerStore {
   reconcile(entries: SessionEntry[]): number; // append unseen usage entries → count appended
   getSnapshot(): LedgerSnapshot;
   costSince(ts: number): number;
-  providerTodayCost(provider: string): number;
-  providerTodayTopModel(provider: string): { model: string; cost: number } | null;
+  // P3-1: ONE pass over lines → { cost, top } (was two O(n) scans per openrouter render frame)
+  providerTodayStats(provider: string): { cost: number; top: { model: string; cost: number } | null };
 }
 
 // Fixed-offset calendar-day bucket: days since epoch in the shifted frame.
@@ -201,28 +201,21 @@ export function createLedgerStore(opts: LedgerStoreOpts): LedgerStore {
       return sum;
     },
 
-    providerTodayCost(provider: string): number {
+    providerTodayStats(provider: string): { cost: number; top: { model: string; cost: number } | null } {
+      // Single pass (P3-1): both the cost sum and the top-model re-rank in one scan.
       const todayIdx = localDayIndex(now(), offset);
-      let sum = 0;
-      for (const l of lines) {
-        if (l.provider !== provider || localDayIndex(l.ts, offset) !== todayIdx) continue;
-        sum += l.cost;
-      }
-      return sum;
-    },
-
-    providerTodayTopModel(provider: string): { model: string; cost: number } | null {
-      const todayIdx = localDayIndex(now(), offset);
+      let cost = 0;
       const byModel = new Map<string, number>();
       for (const l of lines) {
         if (l.provider !== provider || localDayIndex(l.ts, offset) !== todayIdx) continue;
+        cost += l.cost;
         byModel.set(l.model, (byModel.get(l.model) ?? 0) + l.cost);
       }
       let top: { model: string; cost: number } | null = null;
-      for (const [model, cost] of byModel) {
-        if (!top || cost > top.cost) top = { model, cost };
+      for (const [model, modelCost] of byModel) {
+        if (!top || modelCost > top.cost) top = { model, cost: modelCost };
       }
-      return top;
+      return { cost, top };
     },
   };
 }

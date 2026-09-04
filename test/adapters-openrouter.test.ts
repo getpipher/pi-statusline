@@ -31,8 +31,7 @@ function fakeLedger(today: number, top: { model: string; cost: number } | null):
     load: () => {}, reconcile: () => 0,
     getSnapshot: () => ({ todayCost: 0, last7Cost: 0, last30Cost: 0, daily: [], repoCost: 0 }),
     costSince: () => 0,
-    providerTodayCost: () => today,
-    providerTodayTopModel: () => top,
+    providerTodayStats: () => ({ cost: today, top }),
   } as LedgerStore;
 }
 
