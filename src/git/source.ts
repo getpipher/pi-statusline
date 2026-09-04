@@ -31,8 +31,7 @@ function formatLocalMidnight(now: number): string {
   const sign = offsetMin >= 0 ? "+" : "-";
   const abs = Math.abs(offsetMin);
   const pad = (n: number): string => String(n).padStart(2, "0");
-  const p = (n: number): string => String(n).padStart(2, "0");
-  return `${mid.getFullYear()}-${pad(mid.getMonth() + 1)}-${pad(mid.getDate())} 00:00:00 ${sign}${p(Math.floor(abs / 60))}${p(abs % 60)}`;
+  return `${mid.getFullYear()}-${pad(mid.getMonth() + 1)}-${pad(mid.getDate())} 00:00:00 ${sign}${pad(Math.floor(abs / 60))}${pad(abs % 60)}`;
 }
 
 export function createGitSource(opts: GitSourceOpts = {}): GitSource {
