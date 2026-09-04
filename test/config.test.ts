@@ -23,7 +23,7 @@ test("DEFAULT_CONFIG has expected shape", () => {
     enabled: true,
     zai: { tier: "auto", pollIntervalMs: 180_000 },
     deen: { city: "Jakarta", country: "Indonesia", method: "auto", escalateMinutes: 30 },
-    display: { rows: ["identity", "ctx", "money", "quota", "deen", "ambient"], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default", glyphs: "unicode", barStyle: "blocks" },
+    display: { rows: ["identity", "ctx", "money", "quota", "deen", "ambient"], bars: true, showTokens: true, showContext: true, showGit: true, showSession: true, showVersions: false, theme: "default", glyphs: "unicode" },
     providers: { openrouter: { enabled: true, pollIntervalMs: 600_000 } },
   });
 });
@@ -209,16 +209,4 @@ test("display.glyphs defaults unicode, accepts nerd/ascii, lenient on wrong type
   const badPath = join(tmpDir, "glyphs-bad.json");
   writeFileSync(badPath, JSON.stringify({ display: { glyphs: 42 } }));
   assert.equal(loadConfig(badPath).config.display.glyphs, "unicode");
-});
-
-test("display.barStyle defaults blocks, accepts rounded/dots/shaded, lenient on wrong type", () => {
-  const defPath = join(tmpDir, "bar-default.json");
-  writeFileSync(defPath, JSON.stringify({}));
-  assert.equal(loadConfig(defPath).config.display.barStyle, "blocks");
-  const dotsPath = join(tmpDir, "bar-dots.json");
-  writeFileSync(dotsPath, JSON.stringify({ display: { barStyle: "dots" } }));
-  assert.equal(loadConfig(dotsPath).config.display.barStyle, "dots");
-  const badPath = join(tmpDir, "bar-bad.json");
-  writeFileSync(badPath, JSON.stringify({ display: { barStyle: true } }));
-  assert.equal(loadConfig(badPath).config.display.barStyle, "blocks");
 });

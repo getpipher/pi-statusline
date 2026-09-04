@@ -87,7 +87,7 @@ In `~/.pi/agent/settings.json`:
   established marks, e.g. `⎇ main`), `"nerd"` (Nerd Font glyphs, e.g. the
   branch icon — needs a Nerd Font terminal), or `"ascii"` (plain text, e.g.
   `git: main`). Unknown values are ignored (default retained).
-- **`display.barStyle`** — progress-bar character style for bar-rendering
+- **`display.barStyle`** — removed in v0.6.3: the bars themselves were removed in v0.4.1 and no renderer ever consumed the style; the key is now silently ignored (same lenient path as any unknown key). `display.bars` remains accepted for back-compat.
   formats: `"blocks"` (default, `████░░░░░░`), `"rounded"` (`▰▰▰▰▰▱▱▱▱▱`),
   `"dots"` (`●●●●●○○○○○`), `"shaded"` (`▓▓▓▓▓░░░░░`). Plumbed through the
   render snapshot; inert until a bar format consumes it.

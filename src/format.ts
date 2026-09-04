@@ -17,34 +17,6 @@ export function formatMoney(n: number): string {
   return n.toFixed(2);
 }
 
-export type BarStyle = "blocks" | "rounded" | "dots" | "shaded";
-
-const BAR_CHARS: Record<BarStyle, { filled: string; empty: string }> = {
-  blocks: { filled: "█", empty: "░" },
-  rounded: { filled: "▰", empty: "▱" },
-  dots: { filled: "●", empty: "○" },
-  shaded: { filled: "▓", empty: "░" },
-};
-
-export function renderBar(ratio: number, cells = 10, style: BarStyle = "blocks"): string {
-  const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
-  const chars = BAR_CHARS[style] ?? BAR_CHARS.blocks;
-  const filled = Math.round(clamped * cells);
-  return `▕${chars.filled.repeat(filled)}${chars.empty.repeat(cells - filled)}▏`;
-}
-
-// Two-tone bar: head (`▕` + filled cells) takes the fill color (accent/warning/error),
-// tail (empty cells + `▏`) stays dim — renderBar above stays for plain-string formats.
-export function splitBar(ratio: number, cells = 10): { filled: string; empty: string } {
-  const clamped = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
-  const filledCount = Math.round(clamped * cells);
-  return {
-    filled: `▕${"█".repeat(filledCount)}`,
-    empty: `${"░".repeat(cells - filledCount)}▏`,
-  };
-}
-
-
 export function formatClock(ts: number): string {
   const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;

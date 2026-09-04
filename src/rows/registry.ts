@@ -7,7 +7,6 @@ import type { LedgerSnapshot } from "../ledger/store.ts";
 import type { DeenSnapshot } from "../deen/source.ts";
 import type { GitSnapshot } from "../git/source.ts";
 
-import type { BarStyle } from "../format.ts";
 import type { GlyphStyle } from "../glyphs.ts";
 
 export interface RowSnapshot {
@@ -21,7 +20,6 @@ export interface RowSnapshot {
   git: GitSnapshot | null; // Task 7 — declare NOW with the type import so Task 5/7 share one snapshot migration
   versions: { sl: string; pi: string | null }; // SL = our package, PI = linked host package (null = unresolved)
   glyphStyle: GlyphStyle; // segment decoration style (visual upgrade)
-  barStyle: BarStyle; // progress bar character style
   order?: string[]; // echo of the display LINES (compound specs verbatim) — identity reads it to suppress its model when a "model" line-part exists
 }
 

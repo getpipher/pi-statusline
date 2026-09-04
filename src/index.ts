@@ -247,7 +247,6 @@ export function activateStatusline(
             versions: dependencies.readVersions(),
             order: config.display.rows, // identity reads this to suppress its model when a model line-part exists
             glyphStyle: config.display.glyphs,
-            barStyle: config.display.barStyle,
           };
           const lines = renderRows(registry, config.display.rows, snapshot);
           lastRender = { at: Date.now(), lines: lines.map((frags) => frags.map((f) => f.text).join("")) };
@@ -389,7 +388,6 @@ export function activateStatusline(
             versions: dependencies.readVersions(),
             order: config.display.rows,
             glyphStyle: config.display.glyphs,
-            barStyle: config.display.barStyle,
           };
           const applied = await ctx.ui.custom<string[] | null>((tui, theme, _kb, done) => {
             const panel = createArrangePanel({

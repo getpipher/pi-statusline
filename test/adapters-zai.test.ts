@@ -144,7 +144,6 @@ function snap(partial: Partial<RowSnapshot>): RowSnapshot {
     git: null,
     versions: { sl: "", pi: null },
     glyphStyle: "unicode",
-    barStyle: "blocks",
     ...partial,
   };
 }

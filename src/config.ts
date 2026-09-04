@@ -3,7 +3,6 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { KNOWN_ROW_IDS, parseLineSpec } from "./types.ts";
 import type { GlyphStyle } from "./glyphs.ts";
-import type { BarStyle } from "./format.ts";
 
 export interface StatuslineConfig {
   enabled: boolean;
@@ -34,7 +33,6 @@ export interface StatuslineConfig {
     showVersions: boolean; // ambient SL/PI stamps (spec §15), default off
     theme: string; // named preset — validated at use, unknown-row precedent
     glyphs: GlyphStyle; // segment decoration style (visual upgrade)
-    barStyle: BarStyle; // progress bar character style
   };
 }
 
@@ -60,7 +58,6 @@ export const DEFAULT_CONFIG: StatuslineConfig = {
     showVersions: false,
     theme: "default",
     glyphs: "unicode",
-    barStyle: "blocks",
   },
 };
 
@@ -129,7 +126,6 @@ export function loadConfig(path: string): ConfigLoadResult {
     if (typeof d.showVersions === "boolean") cfg.display.showVersions = d.showVersions;
     if (typeof d.theme === "string") cfg.display.theme = d.theme;
     if (d.glyphs === "nerd" || d.glyphs === "unicode" || d.glyphs === "ascii") cfg.display.glyphs = d.glyphs;
-    if (d.barStyle === "blocks" || d.barStyle === "rounded" || d.barStyle === "dots" || d.barStyle === "shaded") cfg.display.barStyle = d.barStyle;
     if (Array.isArray(d.rows)) {
       const valid: string[] = [];
       for (const entry of d.rows) {

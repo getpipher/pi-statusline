@@ -12,7 +12,7 @@ import type { RowSnapshot } from "../src/rows/registry.ts";
 function snapshot(): RowSnapshot {
   return {
     now: 0, width: 500, statuses: "", config: DEFAULT_CONFIG, deen: null, git: null,
-    versions: { sl: "", pi: null }, glyphStyle: "unicode", barStyle: "blocks",
+    versions: { sl: "", pi: null }, glyphStyle: "unicode",
     session: { sessionName: "s", repoName: "r", branch: "main", modelId: "glm-5.2", provider: "zai",
       usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, count: 0 },
       contextTokens: 50_000, contextWindow: 200_000, contextPercent: 25, thinkingLevel: "high", spanMs: 0 },
