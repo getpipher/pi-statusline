@@ -325,13 +325,10 @@ export function activateStatusline(
   });
 
   pi.registerCommand("statusline", {
-    description: "Configure the statusline (arrange | refresh | status | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
+    description: "Configure the statusline (no args = arrange TUI | arrange | refresh | status | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>)",
     handler: async (args: string | undefined, ctx: ExtensionContext) => {
       const action = parseStatuslineArgs(args);
       switch (action.action) {
-        case "open-panel":
-          ctx.ui.notify("Use /statusline refresh | on | off | tier <auto|lite|pro|max> | deen <city|auto> | rows <id[,id...]>", "info");
-          break;
         case "refresh": {
           if (adapters.length === 0) {
             ctx.ui.notify("No provider adapters configured", "warning");

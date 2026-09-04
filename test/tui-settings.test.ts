@@ -4,9 +4,10 @@ import assert from "node:assert/strict";
 
 import { parseStatuslineArgs } from "../src/tui/settings.ts";
 
-test("parseStatuslineArgs: empty args → 'open-panel'", () => {
-  assert.deepEqual(parseStatuslineArgs(""), { action: "open-panel" });
-  assert.deepEqual(parseStatuslineArgs(undefined), { action: "open-panel" });
+test("parseStatuslineArgs: empty args → arrange TUI (no-arg opens the panel — /todo house convention)", () => {
+  assert.deepEqual(parseStatuslineArgs(""), { action: "arrange" });
+  assert.deepEqual(parseStatuslineArgs(undefined), { action: "arrange" });
+  assert.deepEqual(parseStatuslineArgs("   "), { action: "arrange" });
 });
 
 test("parseStatuslineArgs: 'refresh' → refresh action", () => {

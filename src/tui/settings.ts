@@ -2,7 +2,6 @@
 import { KNOWN_ROW_IDS, parseLineSpec } from "../types.ts";
 
 export type StatuslineAction =
-  | { action: "open-panel" }
   | { action: "refresh" }
   | { action: "status" }
   | { action: "arrange" }
@@ -16,7 +15,9 @@ export type StatuslineAction =
 const VALID_TIERS = ["auto", "lite", "pro", "max"] as const;
 
 export function parseStatuslineArgs(args: string | undefined): StatuslineAction {
-  if (!args || args.trim() === "") return { action: "open-panel" };
+  // No-arg = open the arrange TUI (v0.6.2) — the /todo house convention: the bare
+  // command opens the interactive panel, never a hint line.
+  if (!args || args.trim() === "") return { action: "arrange" };
 
   const parts = args.trim().split(/\s+/);
   const cmd = parts[0]!.toLowerCase();
