@@ -17,7 +17,7 @@ Ctx: 34% (68.0K/200.0K) | Tokens: 48.0K in / 6.2K out | Cache: 68% hit
 REPO $12.34 | DAY $8.40 | 7DAY $31.20 | 30DAY $118.75
 zai 5HRS 75%/42% (2.0k) reset 2h55m | 7DAY 15%/86% (10k) reset 1d0h
 deen Fajr 05:00 ✓ | Dhuhr 12:00 (2h) | Asr 15:30 | Maghrib 18:00 | Isha 19:30 | 17 Rabīʿ al-awwal 1448 | Jakarta
-04:12 | coding 3h12m | commits 7 | SL:0.4.0 · PI:0.84.4
+04:12 | coding 3h12m | commits 7 | SL:0.6.3 · PI:0.84.4
 ```
 
 Color semantics (theme-integrated hues): money values `success` (green), git branch
@@ -87,16 +87,19 @@ In `~/.pi/agent/settings.json`:
   established marks, e.g. `⎇ main`), `"nerd"` (Nerd Font glyphs, e.g. the
   branch icon — needs a Nerd Font terminal), or `"ascii"` (plain text, e.g.
   `git: main`). Unknown values are ignored (default retained).
-- **`display.barStyle`** — removed in v0.6.3: the bars themselves were removed in v0.4.1 and no renderer ever consumed the style; the key is now silently ignored (same lenient path as any unknown key). `display.bars` remains accepted for back-compat.
-  formats: `"blocks"` (default, `████░░░░░░`), `"rounded"` (`▰▰▰▰▰▱▱▱▱▱`),
-  `"dots"` (`●●●●●○○○○○`), `"shaded"` (`▓▓▓▓▓░░░░░`). Plumbed through the
-  render snapshot; inert until a bar format consumes it.
+- **`display.barStyle`** — removed in v0.6.3: the bars themselves were removed in
+  v0.4.1 and no renderer ever consumed the style; the key is now silently ignored
+  (same lenient path as any unknown key). `display.bars` remains accepted for
+  back-compat.
 - **`providers.openrouter`** — the OpenRouter credits row: `enabled` (default
   `true`; a missing `openrouter.key` in `~/.pi/agent/auth.json` leaves the row
   inert) and `pollIntervalMs` (default 600000). The row shows
   `or $X.XX left · $X.XX today · top: <model> $X.XX` — `today`/`top` come from
   the **local ledger's** attributed spend (the credits API has no per-window or
-  per-model breakdown).
+  per-model breakdown). Attribution note (P3-37, by design): ledger lines carry
+  the provider/model active **at reconcile time** — a mid-session provider
+  switch attributes only the lines recorded after the switch; earlier lines keep
+  the provider they were recorded with.
 - **`deen`** — prayer-tracker settings (see **Deen** below). `city` may be
   `"auto"` for IP-based geolocation; `method` is the [aladhan calculation
   method](https://aladhan.com/calculation-methods) ("auto" = aladhan default);
