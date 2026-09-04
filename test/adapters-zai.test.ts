@@ -108,6 +108,27 @@ test("createZaiAdapter: matches only zai; inert without key; fetch refreshes cur
   noKey.start();
   await noKey.fetch();
   assert.equal(noKey.current(), null);
+  noKey.stop();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+// P3-22 pin: a successful fetch must fire the render hook (index wires it to requestRender).
+test("createZaiAdapter: successful fetch fires onRefresh", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "zai-onrefresh-"));
+  let refreshes = 0;
+  const adapter = createZaiAdapter({
+    authJsonPath: join(dir, "auth.json"),
+    readKey: () => "fixture-key",
+    pollIntervalMs: () => 3_600_000,
+    fetchFn: async () => QUOTA,
+    onRefresh: () => { refreshes += 1; },
+  });
+  adapter.start();
+  await adapter.fetch();
+  assert.equal(refreshes, 1, "first successful fetch → render hook fired");
+  await adapter.fetch();
+  assert.equal(refreshes, 2, "second successful fetch → render hook fired again");
+  adapter.stop();
   rmSync(dir, { recursive: true, force: true });
 });
 

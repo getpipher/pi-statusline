@@ -11,6 +11,7 @@ import {
   createQuotaPoller,
   type QuotaResult,
 } from "../src/quota/zai.ts";
+import { FIVE_HOUR_MS, windowElapsedPercent } from "../src/quota/project.ts";
 
 let tmpDir: string;
 
@@ -106,6 +107,43 @@ test("parseQuotaResponse returns null when limits array empty", () => {
     code: 200, success: true, data: { limits: [], level: "lite" },
   }));
   assert.equal(result, null);
+});
+
+// ── P3-26 pin: JSON 1e999 parses to Infinity — the isFinite guard must reject the entry ──
+test("parseQuotaResponse rejects non-finite entry fields (1e999 → Infinity)", () => {
+  const onlyBad = parseQuotaResponse(JSON.stringify({
+    code: 200, success: true,
+    data: { limits: [
+      { type: "CREDIT_LIMIT", unit: 3, number: 5, usage: 2000, currentValue: 1501, remaining: 498, percentage: 1e999, nextResetTime: 1786539568992 },
+    ], level: "lite" },
+  }));
+  assert.equal(onlyBad, null, "Infinity percentage → entry rejected → no windows left");
+
+  // one bad + one good → the good window survives
+  const mixed = parseQuotaResponse(JSON.stringify({
+    code: 200, success: true,
+    data: { limits: [
+      { type: "CREDIT_LIMIT", unit: 3, number: 5, usage: 2000, currentValue: 1501, remaining: 498, percentage: 1e999, nextResetTime: 1786539568992 },
+      { type: "CREDIT_LIMIT", unit: 6, number: 1, usage: 10000, currentValue: 1501, remaining: 8498, percentage: 15, nextResetTime: 1787126084998 },
+    ], level: "lite" },
+  }));
+  assert.ok(mixed);
+  assert.equal(mixed!.fiveHour, null);
+  assert.equal(mixed!.weekly!.percentage, 15);
+});
+
+// ── P3-15/P3-8 pins: windowElapsedPercent boundary + fractional-round behavior ──
+test("windowElapsedPercent pins: not-started 0 / at-start 0 / at-end 100 / stale clamped 100 / fractional rounds", () => {
+  const len = FIVE_HOUR_MS;
+  const start = 1_000_000;
+  const end = start + len;
+  assert.equal(windowElapsedPercent(end, len, start - 1), 0, "not yet started → 0%");
+  assert.equal(windowElapsedPercent(end, len, start), 0, "exactly at window start → 0%");
+  assert.equal(windowElapsedPercent(end, len, start + Math.floor(len * 0.5)), 50, "halfway → 50%");
+  assert.equal(windowElapsedPercent(end, len, end), 100, "exactly at reset → 100%");
+  assert.equal(windowElapsedPercent(end, len, end + 86_400_000), 100, "stale nextResetTime clamps to 100%");
+  // P3-8: fractional percent rounds half-up (87.5 → 88)
+  assert.equal(windowElapsedPercent(end, len, start + Math.floor(len * 0.875)), 88);
 });
 
 test("parseQuotaResponse skips malformed limits but keeps a valid window", () => {

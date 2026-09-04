@@ -44,6 +44,19 @@ test("dirty worktree + no upstream: dirty=true, ahead/behind null (fragment omit
   assert.deepEqual(src.get(), { dirty: true, ahead: null, behind: null, commitsToday: 0 });
 });
 
+// P3-6 pin: malformed rev-list count output → NaN → commitsToday null (fragment omitted, no crash)
+test("malformed rev-list count output → commitsToday null (fragment omitted)", async () => {
+  const run = fakeRun({
+    "status --porcelain": "",
+    "rev-list --left-right --count HEAD...@{upstream}": "2\t3",
+    "rev-list --count --since 2026-09-02 00:00:00 +0800 HEAD": "garbage not a number",
+  });
+  const src = createGitSource({ now: () => NOW, ttlMs: 30_000, run });
+  src.refresh(true);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(src.get(), { dirty: false, ahead: 2, behind: 3, commitsToday: null });
+});
+
 test("not a git repo: get() returns null; nothing throws", async () => {
   const run = (_cwd: string, _args: string[]): Promise<string> =>
     Promise.reject(new Error("fatal: not a git repository"));
