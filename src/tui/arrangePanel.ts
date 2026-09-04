@@ -58,6 +58,11 @@ export function createArrangePanel(deps: ArrangePanelDeps) {
     component: {
       render(width: number): string[] {
         const out: string[] = [];
+        // Armory panel frame (armory-todo/armory-fleet parity): DynamicBorder top/bottom
+        // + blank spacers — DynamicBorder.render(width) = color("─".repeat(max(1, width))).
+        const border = accent("─".repeat(Math.max(1, width)));
+        out.push(border);
+        out.push("");
         // WYSIWYG preview: the DRAFT through the real registry — same path as the footer.
         out.push(dim("  PREVIEW (live)"));
         const rendered = renderRows(deps.registry, applyDraft(draft), {
@@ -83,6 +88,8 @@ export function createArrangePanel(deps: ArrangePanelDeps) {
         } else {
           out.push(dim("  " + HELP));
         }
+        out.push("");
+        out.push(border);
         return out;
       },
       invalidate(): void {},

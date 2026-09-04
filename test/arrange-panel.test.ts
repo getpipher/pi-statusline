@@ -75,7 +75,29 @@ test("handleInput: '[' / ']' move the selected line; 'x' removes it", () => {
   assert.ok(!out.includes("► ctx"), "ctx line removed");
 });
 
-test("enter saves (done with applied draft), esc cancels (done null)", () => {
+test("frame: DynamicBorder top + spacer, spacer + border bottom (armory-todo/fleet parity)", () => {
+  const { render } = makePanel(["identity"]);
+  const lines = render().split("\n");
+  const border = "─".repeat(120);
+  assert.equal(lines[0], border, "first line = full-width border");
+  assert.equal(lines[1], "", "blank spacer under the top border");
+  assert.equal(lines[lines.length - 1], border, "last line = full-width border");
+  assert.equal(lines[lines.length - 2], "", "blank spacer above the bottom border");
+});
+
+test("frame is accent-colored when a theme is provided", () => {
+  const registry = createRowRegistry([createIdentityRow()]);
+  const theme = { fg: (_role: string, s: string) => `«${s}»` } as never;
+  const panel = createArrangePanel({
+    registry, snapshot: snapshot(), initial: ["identity"], theme,
+    onChange: () => {}, onDone: () => {},
+  });
+  const out = panel.component.render(40).map(strip);
+  assert.match(out[0], /^«─{40}»$/, "top border wrapped by theme accent");
+  assert.match(out[out.length - 1], /^«─{40}»$/, "bottom border wrapped by theme accent");
+});
+
+test("enter saves (done with applied draft), esc cancels (done null)", () => { 
   const p1 = makePanel(["identity"]);
   p1.render();
   p1.panel.component.handleInput("\r");
