@@ -10,7 +10,7 @@
 
 ## Global Constraints (every task implicitly includes these)
 
-- Org spelling **getpipher** (two p's, never "getpither"). No AI attribution anywhere.
+- Org spelling **getpipher** (two p's — spell letter-by-letter). No AI attribution anywhere.
 - 2-space indent, TypeScript strict (`pnpm typecheck` clean), `pnpm test:run` green after every task.
 - TDD: RED → GREEN per behavior. One commit per feature/fix.
 - Secrets (zai/openrouter keys) are read from `auth.json`, **never logged, never committed**.

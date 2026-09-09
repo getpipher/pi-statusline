@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Org spelling **getpipher** (two p's) — never getpither. No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
+- Org spelling **getpipher** (two p's — spell letter-by-letter; never emit drift forms). No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
 - TDD mandatory; `pnpm test:run` (node:test via tsx) after changes; `pnpm typecheck` clean. No build step (raw .ts via tsx at pi runtime).
 - Secrets: read `zai.key` from `~/.pi/agent/auth.json` in-process; never log/echo/commit it. `.env`/auth.json never committed.
 - z.ai quota API: `GET https://api.z.ai/api/monitor/usage/quota/limit` with `Authorization: Bearer <zai inference key>` → 200 `{ data: { limits: [...], level: "lite"|"pro"|"max" } }`. `nextResetTime` = ms-epoch UTC. Same Bearer perimeter as inference. Zero credit cost to poll.

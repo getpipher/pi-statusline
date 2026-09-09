@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Org spelling **getpipher** (two p's) — never getpither. No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
+- Org spelling **getpipher** (two p's — spell letter-by-letter; never emit drift forms). No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
 - TDD mandatory: failing test first (RED), then implementation (GREEN). `pnpm test:run` + `pnpm typecheck` clean before every commit. One commit per task.
 - Branch: all work on `feat/v2-p2-deen` (created from main in Task 1). Merge to main ONLY in Task 9, after the final whole-branch review.
 - pi runtime ground truths (do NOT re-derive): session entries have `id: string` + ISO `timestamp`; `getEntries()` for totals; `setFooter` render returns `string[]`; timers MUST `.unref()`; render path NEVER awaits — fetches degrade to `null` (row omitted) or last-good cache with `· stale <n>m`; never throw into render.

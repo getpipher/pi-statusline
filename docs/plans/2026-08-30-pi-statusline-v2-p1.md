@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Org spelling **getpipher** (two p's) — never getpither. No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
+- Org spelling **getpipher** (two p's — spell letter-by-letter; never emit drift forms). No AI attribution anywhere. 2-space indent, TypeScript strict, MIT license.
 - TDD mandatory: write the failing test, run it (RED), implement, run again (GREEN). `pnpm test:run` + `pnpm typecheck` clean before every commit. One commit per task.
 - Branch: do all work on `feat/v2-p1-editorial` (created from `main` in Task 1). Merge to main happens only in Task 12.
 - Secrets: `zai.key` read from `~/.pi/agent/auth.json` in-process; never log/echo/commit it.
