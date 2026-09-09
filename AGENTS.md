@@ -40,7 +40,7 @@
 
 ## Conventions
 
-- Spelling: the org is **getpipher** (get·pi·pher — two p's). Never `getpither`. (See global memory.)
+- Spelling: the org is **getpipher** (get·pi·pher — two p's; spell it letter-by-letter before writing). (See global memory.)
 - No AI attribution in commits/PRs/files.
 - 2-space indent, TypeScript.
 - MIT license.
